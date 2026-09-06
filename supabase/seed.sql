@@ -1,0 +1,2 @@
+-- Supabase local and dev seed file
+-- Pre-populates sample data for Phase 1 testing

@@ -1,0 +1,12 @@
+{
+  "name": "@pholio/tracker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "bun build tracker.ts --minify --outfile dist/tracker.js",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

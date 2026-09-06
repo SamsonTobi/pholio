@@ -9,24 +9,24 @@ How to mark done: `bun run check` + `bun run test` green for the touched phase, 
 ## Phase 0 — Foundation (monorepo, web shell, env, clients)
 
 - [x] 0.1 Init bun workspaces root `package.json` with workspaces `apps/*`, `packages/*`, `workers/*`. Add root scripts `dev`, `check`, `test`, `lint`.
-- [ ] 0.2 Scaffold `apps/web` Next.js 15 App Router TypeScript strict (`bunx create-next-app`). Enable `appDir`, `src/`, import alias `@/*`.
-- [ ] 0.3 Add deps to `apps/web`: `tailwindcss@4`, `shadcn`, `lucide-react`, `next-themes`, `zustand`, `@tanstack/react-query`, `@supabase/supabase-js`, `@supabase/ssr`, `octokit`, `zod`, `react-hook-form`, `@hookform/resolvers`, `resend`, `react-email`, `vitest`, `playwright`, `eslint`, `prettier`.
-- [ ] 0.4 Init Tailwind v4 (`@import "tailwindcss"`), theme tokens, dark class strategy for `next-themes`. Verify `bun run dev` renders.
-- [ ] 0.5 Init shadcn (`bunx shadcn@latest init`) with `src/components/ui` path. Add `button card dialog input tabs avatar badge tooltip separator skeleton dropdown-menu`.
-- [ ] 0.6 Create `packages/shared` (`package.json`, `tsconfig`, `index.ts`): export `projectSchema`, `showcaseSchema`, `mcpSchemas`, `scoring` stubs. Wire workspace dep into `apps/web`.
-- [ ] 0.7 Create `packages/tracker` scaffold (`tracker.ts`, `package.json`, build script to `dist/tracker.js`). Assert gzip <1KB in CI later.
-- [ ] 0.8 Create `workers/realtime` scaffold (`wrangler.toml`, `src/index.ts`, `src/do.ts` placeholders). Add `wrangler` devDep.
-- [ ] 0.9 Create `supabase/` (`config.toml`, `seed.sql`, `migrations/`). Link Supabase Cloud project. Document Supabase MCP usage for migrations.
-- [ ] 0.10 Create `apps/web/.env.example` with all keys from plan §3 (`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_TRACKER_URL`, `NEXT_PUBLIC_REALTIME_URL`, `REALTIME_FANOUT_SECRET`, Supabase keys, `GITHUB_*`, `RESEND_API_KEY`). Add `.env.local` to `.gitignore`.
-- [ ] 0.11 Implement `src/lib/env.ts` zod validation for all env. Fail fast on boot. Export `APP_URL`, `TRACKER_URL`, `REALTIME_URL` helpers (`showcaseUrl(slug)`, `inviteUrl(token)`).
-- [ ] 0.12 Implement Supabase clients: `src/lib/supabase/client.ts` (browser), `server.ts` (RSC + Route), `admin.ts` (service_role, server-only), `middleware.ts` session refresh. Add `types.ts` placeholder + `bun run types:gen` script.
-- [ ] 0.13 Implement root layout (`app/layout.tsx`): `next-themes` provider, React Query provider, metadata base using `NEXT_PUBLIC_APP_URL`, favicon, `sitemap.ts`, `robots.ts`.
-- [ ] 0.14 Implement marketing `app/(marketing)/page.tsx` with exact copy: `Join Pholio`, `Login`, `Used by 300+ builders`, `Self-maintaining showcase for product builders`, hero sub verbatim. No other hero variants.
-- [ ] 0.15 Implement nav (logged-out) + footer with links to `/login`, `/docs/agent`. Mobile responsive 360px.
-- [ ] 0.16 Implement `GET /api/health` returning `{ok:true, env:APP_URL}` (no secrets). Use for deploy checks.
-- [ ] 0.17 Add `bun run check` (`tsc --noEmit` + `eslint`) and `bun run test` (`vitest run`). Verify green.
-- [ ] 0.18 Add banned-term CI check (fails if banned P-word appears in `apps/`, `packages/`, `workers/`).
-- [ ] Acceptance 0: `bun install && bun run dev && bun run check` green, `/` shows exact copy, `/api/health` 200.
+- [x] 0.2 Scaffold `apps/web` Next.js 15 App Router TypeScript strict (`bunx create-next-app`). Enable `appDir`, `src/`, import alias `@/*`.
+- [x] 0.3 Add deps to `apps/web`: `tailwindcss@4`, `shadcn`, `lucide-react`, `next-themes`, `zustand`, `@tanstack/react-query`, `@supabase/supabase-js`, `@supabase/ssr`, `octokit`, `zod`, `react-hook-form`, `@hookform/resolvers`, `resend`, `react-email`, `vitest`, `playwright`, `eslint`, `prettier`.
+- [x] 0.4 Init Tailwind v4 (`@import "tailwindcss"`), theme tokens, dark class strategy for `next-themes`. Verify `bun run dev` renders.
+- [x] 0.5 Init shadcn (`bunx shadcn@latest init`) with `src/components/ui` path. Add `button card dialog input tabs avatar badge tooltip separator skeleton dropdown-menu`.
+- [x] 0.6 Create `packages/shared` (`package.json`, `tsconfig`, `index.ts`): export `projectSchema`, `showcaseSchema`, `mcpSchemas`, `scoring` stubs. Wire workspace dep into `apps/web`.
+- [x] 0.7 Create `packages/tracker` scaffold (`tracker.ts`, `package.json`, build script to `dist/tracker.js`). Assert gzip <1KB in CI later.
+- [x] 0.8 Create `workers/realtime` scaffold (`wrangler.toml`, `src/index.ts`, `src/do.ts` placeholders). Add `wrangler` devDep.
+- [x] 0.9 Create `supabase/` (`config.toml`, `seed.sql`, `migrations/`). Link Supabase Cloud project. Document Supabase MCP usage for migrations.
+- [x] 0.10 Create `apps/web/.env.example` with all keys from plan §3 (`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_TRACKER_URL`, `NEXT_PUBLIC_REALTIME_URL`, `REALTIME_FANOUT_SECRET`, Supabase keys, `GITHUB_*`, `RESEND_API_KEY`). Add `.env.local` to `.gitignore`.
+- [x] 0.11 Implement `src/lib/env.ts` zod validation for all env. Fail fast on boot. Export `APP_URL`, `TRACKER_URL`, `REALTIME_URL` helpers (`showcaseUrl(slug)`, `inviteUrl(token)`).
+- [x] 0.12 Implement Supabase clients: `src/lib/supabase/client.ts` (browser), `server.ts` (RSC + Route), `admin.ts` (service_role, server-only), `middleware.ts` session refresh. Add `types.ts` placeholder + `bun run types:gen` script.
+- [x] 0.13 Implement root layout (`app/layout.tsx`): `next-themes` provider, React Query provider, metadata base using `NEXT_PUBLIC_APP_URL`, favicon, `sitemap.ts`, `robots.ts`.
+- [x] 0.14 Implement marketing `app/(marketing)/page.tsx` with exact copy: `Join Pholio`, `Login`, `Used by 300+ builders`, `Self-maintaining showcase for product builders`, hero sub verbatim. No other hero variants.
+- [x] 0.15 Implement nav (logged-out) + footer with links to `/login`, `/docs/agent`. Mobile responsive 360px.
+- [x] 0.16 Implement `GET /api/health` returning `{ok:true, env:APP_URL}` (no secrets). Use for deploy checks.
+- [x] 0.17 Add `bun run check` (`tsc --noEmit` + `eslint`) and `bun run test` (`vitest run`). Verify green.
+- [x] 0.18 Add banned-term CI check (fails if banned P-word appears in `apps/`, `packages/`, `workers/`).
+- [x] Acceptance 0: `bun install && bun run dev && bun run check` green, `/` shows exact copy, `/api/health` 200.
 
 ## Phase 1 — Auth, profiles, slugs, showcase shell
 
