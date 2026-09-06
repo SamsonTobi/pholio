@@ -49,6 +49,7 @@ export type Database = {
           slug_history?: string[];
           created_at?: string;
         };
+        Relationships: [];
       };
       projects: {
         Row: {
@@ -108,6 +109,7 @@ export type Database = {
           telemetry_slug?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       showcases: {
         Row: {
@@ -137,6 +139,7 @@ export type Database = {
           published_at?: string;
           source?: "github" | "agent" | "manual";
         };
+        Relationships: [];
       };
       mockups: {
         Row: {
@@ -160,6 +163,7 @@ export type Database = {
           device?: "browser" | "phone" | "tablet";
           sort?: number;
         };
+        Relationships: [];
       };
       raw_events: {
         Row: {
@@ -183,6 +187,7 @@ export type Database = {
           path?: string | null;
           ts?: string;
         };
+        Relationships: [];
       };
       daily_stats: {
         Row: {
@@ -206,6 +211,7 @@ export type Database = {
           actives_7d?: number;
           total?: number;
         };
+        Relationships: [];
       };
       hacker_groups: {
         Row: {
@@ -235,6 +241,7 @@ export type Database = {
           slug_history?: string[];
           created_at?: string;
         };
+        Relationships: [];
       };
       hacker_group_members: {
         Row: {
@@ -255,6 +262,7 @@ export type Database = {
           role?: "owner" | "member";
           joined_at?: string;
         };
+        Relationships: [];
       };
       hacker_group_invites: {
         Row: {
@@ -287,6 +295,7 @@ export type Database = {
           multi_use?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
       leaderboard_snapshots: {
         Row: {
@@ -304,6 +313,7 @@ export type Database = {
           day?: string;
           rankings?: Json;
         };
+        Relationships: [];
       };
       notifications: {
         Row: {
@@ -330,6 +340,7 @@ export type Database = {
           read_at?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       api_keys: {
         Row: {
@@ -362,7 +373,20 @@ export type Database = {
           revoked_at?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 };

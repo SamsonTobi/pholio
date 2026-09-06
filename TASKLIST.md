@@ -32,28 +32,28 @@ How to mark done: `bun run check` + `bun run test` green for the touched phase, 
 
 Migration(s):
 
-- [ ] 1.1 Migration `001_extensions`: `create extension if not exists "pgcrypto"; create extension if not exists "pg_net"; create extension if not exists "pg_cron";`.
-- [ ] 1.2 Migration `002_profiles`: table `profiles(id uuid primary key references auth.users(id) on delete cascade, slug text unique not null, github_username text unique, github_id bigint, avatar_url text, display_name text, headline text default 'Product engineer', site_url text, template text default 'story' check (template in ('story','index')), slug_history text[] default '{}', created_at timestamptz default now())`. Indexes on `slug`, `github_username`.
-- [ ] 1.3 Migration `003_profile_slug_history_fn`: plpgsql `handle_slug_change()` — on update of `slug`, append `OLD.slug` to `slug_history` if not present. Trigger `trg_profiles_slug_history before update of slug on profiles`.
-- [ ] 1.4 Migration `004_handle_new_user_fn`: plpgsql `handle_new_user()` for `auth.users` insert — derive initial slug from `raw_user_meta_data->>'user_name'`, lowercased, sanitized, deduped with suffix. Insert into `public.profiles`. Trigger on `auth.users`.
-- [ ] 1.5 Migration `005_profiles_rls`: enable RLS. Policies: public `select` on `profiles`; owner `update` where `auth.uid()=id`; service_role bypass. No anon insert/update.
-- [ ] 1.6 Seed `supabase/seed.sql` with 2 demo profiles + showcase links (dev only).
+- [x] 1.1 Migration `001_extensions`: `create extension if not exists "pgcrypto"; create extension if not exists "pg_net"; create extension if not exists "pg_cron";`.
+- [x] 1.2 Migration `002_profiles`: table `profiles(id uuid primary key references auth.users(id) on delete cascade, slug text unique not null, github_username text unique, github_id bigint, avatar_url text, display_name text, headline text default 'Product engineer', site_url text, template text default 'story' check (template in ('story','index')), slug_history text[] default '{}', created_at timestamptz default now())`. Indexes on `slug`, `github_username`.
+- [x] 1.3 Migration `003_profile_slug_history_fn`: plpgsql `handle_slug_change()` — on update of `slug`, append `OLD.slug` to `slug_history` if not present. Trigger `trg_profiles_slug_history before update of slug on profiles`.
+- [x] 1.4 Migration `004_handle_new_user_fn`: plpgsql `handle_new_user()` for `auth.users` insert — derive initial slug from `raw_user_meta_data->>'user_name'`, lowercased, sanitized, deduped with suffix. Insert into `public.profiles`. Trigger on `auth.users`.
+- [x] 1.5 Migration `005_profiles_rls`: enable RLS. Policies: public `select` on `profiles`; owner `update` where `auth.uid()=id`; service_role bypass. No anon insert/update.
+- [x] 1.6 Seed `supabase/seed.sql` with 2 demo profiles + showcase links (dev only).
 
 Auth + app:
 
-- [ ] 1.7 Configure Supabase Auth GitHub provider (`GITHUB_CLIENT_ID/SECRET`, redirect `${NEXT_PUBLIC_APP_URL}/auth/callback`). No email provider.
-- [ ] 1.8 Implement `app/(auth)/login/page.tsx` (`Login` heading, GitHub button, `Join Pholio` cross-link). Same OAuth flow as join, different label.
-- [ ] 1.9 Implement `app/auth/callback/route.ts` (Supabase code exchange, provider_token capture note, redirect to `/pick-repos` if no projects else `/dashboard`).
-- [ ] 1.10 Implement `middleware.ts` Supabase session refresh for `/dashboard/*`, `/pick-repos`, `/api/github/*`.
-- [ ] 1.11 Implement `src/features/auth/server/service.ts` (`getSessionUser`, `requireUser`, `getProviderToken`).
-- [ ] 1.12 Implement `src/features/profile/server/service.ts` (`getBySlug`, `getById`, `updateProfile`, `changeSlug` with history + uniqueness check, `setTemplate`).
-- [ ] 1.13 Implement `src/features/profile/server/schema.ts` zod (`slug /^[a-z0-9-]{3,30}$/`, `display_name`, `headline`, `site_url`, `template`).
-- [ ] 1.14 Implement public `app/[slug]/page.tsx` shell: fetch by slug, fallback lookup in `slug_history` -> `permanentRedirect` to canonical. `notFound()` if missing. Metadata + canonical via `APP_URL`.
-- [ ] 1.15 Implement `app/[slug]/opengraph-image.tsx` using `APP_URL`, avatar + name + top 3 project names.
-- [ ] 1.16 Implement dashboard `app/dashboard/settings/page.tsx`: edit display_name/headline/site_url/slug (with history notice + 301 preview), template radio `story|index` with preview thumbnails.
-- [ ] 1.17 Regenerate `src/lib/supabase/types.ts` via Supabase CLI/MCP. Commit.
-- [ ] 1.18 Vitest: slug sanitize/uniqueness, slug_history trigger logic, `showcaseUrl` uses env.
-- [ ] Acceptance 1: Join with GitHub -> auto row -> live `${APP_URL}/{you}`; slug change keeps old URL 301ing.
+- [x] 1.7 Configure Supabase Auth GitHub provider (`GITHUB_CLIENT_ID/SECRET`, redirect `${NEXT_PUBLIC_APP_URL}/auth/callback`). No email provider.
+- [x] 1.8 Implement `app/(auth)/login/page.tsx` (`Login` heading, GitHub button, `Join Pholio` cross-link). Same OAuth flow as join, different label.
+- [x] 1.9 Implement `app/auth/callback/route.ts` (Supabase code exchange, provider_token capture note, redirect to `/pick-repos` if no projects else `/dashboard`).
+- [x] 1.10 Implement `middleware.ts` Supabase session refresh for `/dashboard/*`, `/pick-repos`, `/api/github/*`.
+- [x] 1.11 Implement `src/features/auth/server/service.ts` (`getSessionUser`, `requireUser`, `getProviderToken`).
+- [x] 1.12 Implement `src/features/profile/server/service.ts` (`getBySlug`, `getById`, `updateProfile`, `changeSlug` with history + uniqueness check, `setTemplate`).
+- [x] 1.13 Implement `src/features/profile/server/schema.ts` zod (`slug /^[a-z0-9-]{3,30}$/`, `display_name`, `headline`, `site_url`, `template`).
+- [x] 1.14 Implement public `app/[slug]/page.tsx` shell: fetch by slug, fallback lookup in `slug_history` -> `permanentRedirect` to canonical. `notFound()` if missing. Metadata + canonical via `APP_URL`.
+- [x] 1.15 Implement `app/[slug]/opengraph-image.tsx` using `APP_URL`, avatar + name + top 3 project names.
+- [x] 1.16 Implement dashboard `app/dashboard/settings/page.tsx`: edit display_name/headline/site_url/slug (with history notice + 301 preview), template radio `story|index` with preview thumbnails.
+- [x] 1.17 Regenerate `src/lib/supabase/types.ts` via Supabase CLI/MCP. Commit.
+- [x] 1.18 Vitest: slug sanitize/uniqueness, slug_history trigger logic, `showcaseUrl` uses env.
+- [x] Acceptance 1: Join with GitHub -> auto row -> live `${APP_URL}/{you}`; slug change keeps old URL 301ing.
 
 ## Phase 2 — GitHub import engine + icon extraction (incl. mobile)
 
