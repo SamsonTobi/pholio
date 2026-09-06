@@ -1,0 +1,15 @@
+{
+  "name": "pholio-workspace",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/*"
+  ],
+  "scripts": {
+    "dev": "bun --filter web dev",
+    "check": "bun --filter web check && bun --filter @pholio/shared check && bun --filter @pholio/tracker check",
+    "test": "vitest run",
+    "lint": "bun --filter web lint"
+  }
+}
