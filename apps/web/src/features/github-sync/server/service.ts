@@ -23,6 +23,121 @@ function isSupabaseLive(): boolean {
   );
 }
 
+export interface SyncRepoInput {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  homepage: string | null;
+  stargazers_count: number;
+  language: string | null;
+  pushed_at: string;
+  private?: boolean;
+  fork?: boolean;
+  archived?: boolean;
+  topics?: string[];
+  owner?: {
+    avatar_url?: string;
+  } | null;
+}
+
+function buildProjectPayload(userId: string, repo: SyncRepoInput) {
+  const parsed = parseReadmeContent(
+    `# ${repo.name}\n\n${repo.description || "A product built with passion."}\n\nLive: ${repo.homepage || ""}\n\nBuilt with ${repo.language || "TypeScript"}`
+  );
+
+  const icon = resolveProjectIcon({
+    repoRootFiles: ["package.json"],
+    liveUrl: repo.homepage || undefined,
+    ownerAvatarUrl: repo.owner?.avatar_url,
+    githubRepoId: repo.id,
+  });
+
+  const telemetrySlug = generateTelemetrySlug(repo.name);
+  const showcaseSlug = repo.name.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+
+  return {
+    owner_id: userId,
+    github_repo_id: repo.id,
+    github_full_name: repo.full_name,
+    name: repo.name,
+    showcase_slug: showcaseSlug,
+    description: repo.description,
+    readme_summary: parsed.summary,
+    icon_url: icon.url,
+    tags: parsed.tags.length > 0 ? parsed.tags : [repo.language || "TypeScript"],
+    language: repo.language,
+    stars: repo.stargazers_count,
+    live_url: repo.homepage || repo.html_url,
+    status: "active" as const,
+    last_push_at: repo.pushed_at,
+    telemetry_slug: telemetrySlug,
+  };
+}
+
+/**
+ * Shared creation path — used by manual import, webhook auto-import, and
+ * any future caller. Same README summary, icon, telemetry slug, initial
+ * showcase draft, and sync event every time.
+ */
+export async function upsertProjectFromRepo(
+  userId: string,
+  repo: SyncRepoInput,
+  eventType: "import" | "push" | "release" = "import",
+  client?: Awaited<ReturnType<typeof createClient>>
+): Promise<Project | null> {
+  const supabase = client ?? (await createClient());
+  const projectPayload = buildProjectPayload(userId, repo);
+
+  // Preserve the existing telemetry_slug on re-import: it is the stable
+  // key for raw_events/daily_stats. Only new projects get a fresh slug.
+  const { data: existing } = await (supabase.from("projects") as any)
+    .select("id, telemetry_slug")
+    .eq("owner_id", userId)
+    .eq("github_repo_id", repo.id)
+    .maybeSingle();
+
+  const { data: project, error } = await (supabase.from("projects") as any)
+    .upsert(
+      existing?.telemetry_slug
+        ? { ...projectPayload, telemetry_slug: existing.telemetry_slug }
+        : projectPayload,
+      { onConflict: "owner_id,github_repo_id" }
+    )
+    .select()
+    .single();
+
+  if (error || !project) return null;
+
+  // Initial showcase draft only on first import (no github-source
+  // showcase yet) — re-imports must not duplicate it.
+  const { data: priorDraft } = await (supabase.from("showcases") as any)
+    .select("id")
+    .eq("project_id", project.id)
+    .eq("source", "github")
+    .limit(1)
+    .maybeSingle();
+
+  if (!priorDraft) {
+    await (supabase.from("showcases") as any).insert({
+      project_id: project.id,
+      owner_id: userId,
+      body: `Initial import of ${project.name} from GitHub. ${project.description || ""}`.trim().substring(0, 600),
+      source: "github",
+    });
+  }
+
+  await (supabase.from("github_sync_events") as any).insert({
+    project_id: project.id,
+    owner_id: userId,
+    event_type: eventType,
+    pushed_at: repo.pushed_at,
+  });
+
+  return project as Project;
+}
+
 export async function listImportableRepos(token?: string | null): Promise<GitHubRepoItem[]> {
   const repos = await listUserRepos(token);
   return repos
@@ -50,86 +165,9 @@ export async function importRepos(
   const createdProjects: Project[] = [];
 
   for (const repo of selectedRepos) {
-    const parsed = parseReadmeContent(
-      `# ${repo.name}\n\n${repo.description || "A product built with passion."}\n\nLive: ${repo.homepage || ""}\n\nBuilt with ${repo.language || "TypeScript"}`
-    );
-
-    const icon = resolveProjectIcon({
-      repoRootFiles: ["package.json"],
-      liveUrl: repo.homepage || undefined,
-      ownerAvatarUrl: repo.owner?.avatar_url,
-      githubRepoId: repo.id,
-    });
-
-    const telemetrySlug = generateTelemetrySlug(repo.name);
-    const showcaseSlug = repo.name.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-
-    const projectPayload = {
-      owner_id: userId,
-      github_repo_id: repo.id,
-      github_full_name: repo.full_name,
-      name: repo.name,
-      showcase_slug: showcaseSlug,
-      description: repo.description,
-      readme_summary: parsed.summary,
-      icon_url: icon.url,
-      tags: parsed.tags.length > 0 ? parsed.tags : [repo.language || "TypeScript"],
-      language: repo.language,
-      stars: repo.stargazers_count,
-      live_url: repo.homepage || repo.html_url,
-      status: "active" as const,
-      last_push_at: repo.pushed_at,
-      telemetry_slug: telemetrySlug,
-    };
-
     try {
-      // Preserve the existing telemetry_slug on re-import: it is the stable
-      // key for raw_events/daily_stats. Only new projects get a fresh slug.
-      const { data: existing } = await (supabase.from("projects") as any)
-        .select("id, telemetry_slug")
-        .eq("owner_id", userId)
-        .eq("github_repo_id", repo.id)
-        .maybeSingle();
-
-      const { data: project } = await (supabase.from("projects") as any)
-        .upsert(
-          existing?.telemetry_slug
-            ? { ...projectPayload, telemetry_slug: existing.telemetry_slug }
-            : projectPayload,
-          { onConflict: "owner_id,github_repo_id" }
-        )
-        .select()
-        .single();
-
-      if (project) {
-        createdProjects.push(project);
-
-        // Initial showcase draft only on first import (no github-source
-        // showcase yet) — re-imports must not duplicate it.
-        const { data: priorDraft } = await (supabase.from("showcases") as any)
-          .select("id")
-          .eq("project_id", project.id)
-          .eq("source", "github")
-          .limit(1)
-          .maybeSingle();
-
-        if (!priorDraft) {
-          await (supabase.from("showcases") as any).insert({
-            project_id: project.id,
-            owner_id: userId,
-            body: `Initial import of ${project.name} from GitHub. ${project.description || ""}`.trim().substring(0, 600),
-            source: "github",
-          });
-        }
-
-        // Insert sync event
-        await (supabase.from("github_sync_events") as any).insert({
-          project_id: project.id,
-          owner_id: userId,
-          event_type: "import",
-          pushed_at: repo.pushed_at,
-        });
-      }
+      const project = await upsertProjectFromRepo(userId, repo, "import", supabase);
+      if (project) createdProjects.push(project);
     } catch (err) {
       // Per-repo failure: surface on live backends, tolerate offline.
       if (isSupabaseLive()) throw err instanceof Error ? err : new Error("Import failed");
