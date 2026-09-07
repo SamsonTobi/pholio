@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pholio/shared": ["../shared/src/index.ts"],
+      "@pholio/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src", "bin"]
+}

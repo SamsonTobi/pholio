@@ -1,22 +1,27 @@
 {
   "name": "@pholio/mcp-server",
   "version": "0.1.0",
-  "description": "Pholio MCP Server for AI coding agents (Claude Desktop, Cursor, Antigravity)",
-  "bin": {
-    "pholio-mcp": "./bin/cli.js"
+  "description": "Thin MCP client entry pointing at PHOLIO_BASE_URL (/api/mcp). Transport is plain JSON-RPC over HTTPS (MCP Streamable HTTP compatible); @modelcontextprotocol/sdk adoption is a tracked follow-up, not required.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "bin": {
+    "pholio-mcp-server": "./bin/cli.js"
+  },
   "scripts": {
-    "start": "bun ./src/index.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "start": "bun src/index.ts",
+    "test": "bunx vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.1",
-    "@pholio/shared": "workspace:*",
-    "zod": "^3.24.2"
+    "@pholio/shared": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
   }
 }

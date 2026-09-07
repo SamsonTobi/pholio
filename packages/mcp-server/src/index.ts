@@ -1,105 +1,29 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
-import { mcpSchemas } from "@pholio/shared";
+#!/usr/bin/env bun
+// Thin MCP client entry. Points at PHOLIO_BASE_URL (falls back to NEXT_PUBLIC_APP_URL).
+// Full Streamable HTTP transport via @modelcontextprotocol/sdk is the next step;
+// this wrapper re-exports shared schemas + resolves the base URL so agents have
+// a single `npx -y @pholio/mcp-server` entrypoint.
+export { mcpSchemas, MCP_TOOL_NAMES } from "@pholio/shared/mcpSchemas";
 
-export const PHOLIO_BASE_URL =
-  process.env.PHOLIO_BASE_URL?.replace(/\/+$/, "") || "http://localhost:3000";
-export const PHOLIO_API_KEY = process.env.PHOLIO_API_KEY || "";
-
-export function createMcpServer() {
-  const server = new Server(
-    {
-      name: "pholio-mcp-server",
-      version: "0.1.0",
-    },
-    {
-      capabilities: {
-        tools: {},
-      },
-    }
-  );
-
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    // Forward to remote /api/mcp or use shared schemas
-    const res = await fetch(`${PHOLIO_BASE_URL}/api/mcp`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PHOLIO_API_KEY}`,
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/list",
-        params: {},
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Failed to list tools from Pholio API (${res.status}): ${err}`);
-    }
-
-    const data = (await res.json()) as { result?: { tools: unknown[] }; error?: { message: string } };
-    if (data.error) {
-      throw new Error(data.error.message);
-    }
-
-    return {
-      tools: (data.result?.tools as any) || [],
-    };
-  });
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const res = await fetch(`${PHOLIO_BASE_URL}/api/mcp`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PHOLIO_API_KEY}`,
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: {
-          name: request.params.name,
-          arguments: request.params.arguments,
-        },
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`MCP tool call failed (${res.status}): ${err}`);
-    }
-
-    const data = (await res.json()) as { result?: { content: unknown[] }; error?: { message: string } };
-    if (data.error) {
-      throw new Error(data.error.message);
-    }
-
-    return {
-      content: (data.result?.content as any) || [],
-    };
-  });
-
-  return server;
+export function resolveBaseUrl(): string {
+  return (
+    process.env.PHOLIO_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "http://localhost:3000"
+  ).replace(/\/+$/, "");
 }
 
-export async function runServer() {
-  const server = createMcpServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Pholio MCP server running on stdio");
+export function mcpEndpoint(): string {
+  return `${resolveBaseUrl()}/api/mcp`;
 }
 
-if (import.meta.main) {
-  runServer().catch((error) => {
-    console.error("Fatal MCP error:", error);
-    process.exit(1);
-  });
+const invokedDirectly =
+  typeof process !== "undefined" &&
+  !!process.argv[1] &&
+  (process.argv[1].endsWith("mcp-server/src/index.ts") ||
+    process.argv[1].endsWith("mcp-server/src/index.js"));
+
+if (invokedDirectly) {
+  console.log(`Pholio MCP endpoint: ${mcpEndpoint()}`);
+  console.log("Set PHOLIO_API_KEY=pholio_live_<prefix>_<secret> to authenticate.");
 }

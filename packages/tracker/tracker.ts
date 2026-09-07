@@ -1,32 +1,29 @@
 (function () {
   if (typeof window === "undefined") return;
 
-  const script = document.currentScript as HTMLScriptElement | null;
-  const telemetrySlug =
+  var script = document.currentScript as HTMLScriptElement | null;
+  var rawSlug =
     script?.getAttribute("data-project") ||
     (window as unknown as { __PHOLIO_SLUG__?: string }).__PHOLIO_SLUG__;
 
-  if (!telemetrySlug) return;
+  if (!rawSlug || !/^[a-z0-9-]{3,64}$/.test(rawSlug)) return;
+  var telemetrySlug = rawSlug;
 
-  const scriptSrc = script?.src || "";
-  let baseUrl = "";
+  var scriptSrc = script?.src || "";
+  var baseUrl = "";
   try {
-    if (scriptSrc) {
-      const url = new URL(scriptSrc);
-      baseUrl = url.origin;
-    }
+    if (scriptSrc) baseUrl = new URL(scriptSrc).origin;
   } catch {
     baseUrl = "";
   }
 
-  const ingestUrl = baseUrl ? `${baseUrl}/api/ingest` : "/api/ingest";
+  var ingestUrl = baseUrl ? baseUrl + "/api/ingest" : "/api/ingest";
 
-  // Session hash in memory & sessionStorage (no cookies)
-  const SESSION_KEY = "_pholio_sid";
-  let sessionId: string | null = null;
+  var SESSION_KEY = "_pholio_sid";
+  var sessionId: string | null = null;
   try {
     sessionId = sessionStorage.getItem(SESSION_KEY);
-    if (!sessionId) {
+    if (!sessionId || !/^[A-Za-z0-9_-]{3,128}$/.test(sessionId)) {
       sessionId =
         Math.random().toString(36).substring(2, 15) +
         Math.random().toString(36).substring(2, 15);
@@ -37,9 +34,11 @@
   }
 
   function ping() {
-    const payload = JSON.stringify({
+    var path = window.location.pathname || "/";
+    if (path.length > 500) path = path.slice(0, 500);
+    var payload = JSON.stringify({
       telemetry_slug: telemetrySlug,
-      path: window.location.pathname,
+      path: path,
       session_hash: sessionId,
     });
 
@@ -55,16 +54,10 @@
     }
   }
 
-  // Initial ping
   ping();
+  setInterval(ping, 60000);
 
-  // 30s heartbeat
-  setInterval(ping, 30000);
-
-  // Visibility change ping
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      ping();
-    }
+    if (document.visibilityState === "hidden") ping();
   });
 })();

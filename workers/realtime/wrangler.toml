@@ -9,7 +9,13 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["RealtimeRoom"]
+new_sqlite_classes = ["RealtimeRoom"]
 
-[vars]
-APP_URL = "http://localhost:3000"
+# NOTE: no [vars] defaults here on purpose. Set non-secret config per env:
+#   [env.production]
+#   vars = { APP_URL = "https://your-prod-domain" }
+# Secrets (never commit): wrangler secret put FANOUT_SECRET
+# For preview/dev: wrangler secret put FANOUT_SECRET --env dev
+
+[env.production]
+vars = { APP_URL = "https://pholio.cc" }
