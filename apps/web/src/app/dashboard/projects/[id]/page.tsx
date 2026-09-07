@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeviceFrame } from "@/components/shared/DeviceFrame";
+import { TelemetrySnippetTab } from "@/features/telemetry/components/TelemetrySnippetTab";
+import { TelemetryChart } from "@/features/telemetry/components/TelemetryChart";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Upload,
@@ -137,7 +140,6 @@ export default function ProjectEditorPage() {
   const [saved, setSaved] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [resynced, setResynced] = useState(false);
-  const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileInputId = useId();
@@ -257,14 +259,24 @@ export default function ProjectEditorPage() {
     }, 400);
   };
 
-  // Telemetry code snippet
-  const telemetrySnippet = `<script defer src="https://pholio.dev/tracker.js" data-project="${initial.telemetry_slug}"></script>`;
+  // Telemetry status query
+  const { data: telemetryStats } = useQuery<{
+    totals?: { visitors_7d: number; actives_7d: number };
+  }>({
+    queryKey: ["telemetry-stats", initial.showcase_slug, 7],
+    queryFn: async () => {
+      const slug = initial.showcase_slug || initial.telemetry_slug;
+      const res = await fetch(`/api/stats?project_slug=${encodeURIComponent(slug)}&days=7`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    refetchInterval: 60_000,
+  });
 
-  const handleCopySnippet = () => {
-    navigator.clipboard.writeText(telemetrySnippet);
-    setCopiedSnippet(true);
-    setTimeout(() => setCopiedSnippet(false), 2000);
-  };
+  const hasEvents = Boolean(
+    (telemetryStats?.totals?.visitors_7d ?? 0) > 0 ||
+    ["pholio-demo", "bankroll-demo"].includes(initial.telemetry_slug)
+  );
 
   return (
     <div className="space-y-8 pb-16">
@@ -620,42 +632,47 @@ export default function ProjectEditorPage() {
           </CardContent>
         </Card>
 
-        {/* Telemetry Snippet Card */}
+        {/* Telemetry & Snippet Section */}
         <Card className="border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900">
           <CardHeader>
-            <CardTitle>Visitor Telemetry Snippet</CardTitle>
-            <CardDescription>
-              Measure live pulse and 7-day activity metrics directly on your showcase card.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="relative rounded-lg bg-neutral-950 p-3 font-mono text-xs text-neutral-100 dark:bg-neutral-950 border border-neutral-800 overflow-x-auto">
-              <pre className="text-[11px] leading-relaxed select-all">
-                {telemetrySnippet}
-              </pre>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleCopySnippet}
-                className="absolute top-2 right-2 h-7 text-[10px] bg-neutral-800 text-neutral-200 hover:bg-neutral-700 hover:text-white"
-              >
-                {copiedSnippet ? (
-                  <>
-                    <Check className="h-3 w-3 mr-1 text-green-400" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3 mr-1" />
-                    Copy Snippet
-                  </>
-                )}
-              </Button>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <CardTitle>Telemetry & Snippet</CardTitle>
+                <CardDescription>
+                  Measure live pulse, active visitors, and 7-day activity metrics on your showcase.
+                </CardDescription>
+              </div>
+              {hasEvents ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 w-fit">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  Receiving events
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-600 dark:bg-neutral-800/80 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700 w-fit">
+                  <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                  Awaiting first ping...
+                </span>
+              )}
             </div>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-              Embed this lightweight (&lt;1KB) tracker script into your product landing page or app shell. No cookies, no personal data fingerprinting.
-            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <TelemetryChart
+              projectSlug={initial.showcase_slug}
+              telemetrySlug={initial.telemetry_slug}
+            />
+
+            <div className="border-t border-neutral-100 dark:border-neutral-800 pt-6">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400 mb-3">
+                Embed Tracking Code
+              </h4>
+              <TelemetrySnippetTab
+                telemetrySlug={initial.telemetry_slug}
+                hasEvents={hasEvents}
+              />
+            </div>
           </CardContent>
         </Card>
 
