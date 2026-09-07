@@ -24,6 +24,11 @@ export interface StatsResponse {
 export interface TelemetryChartProps {
   projectSlug: string;
   telemetrySlug?: string;
+  /**
+   * Owner profile slug. The fanout broadcasts on `showcase:<owner-slug>`
+   * (not the project slug), so the live channel must use it.
+   */
+  ownerSlug?: string | null;
   className?: string;
 }
 
@@ -42,6 +47,7 @@ function formatDayLabel(dayStr: string): { weekday: string; date: string } {
 export function TelemetryChart({
   projectSlug,
   telemetrySlug,
+  ownerSlug,
   className = "",
 }: TelemetryChartProps) {
   const [hoveredDay, setHoveredDay] = useState<DayStat | null>(null);
@@ -50,7 +56,11 @@ export function TelemetryChart({
   const queryClient = useQueryClient();
 
   // Targeted realtime invalidation; per-chart refetchInterval below stays as fallback.
-  useRealtimeChannel(effectiveSlug ? `showcase:${effectiveSlug}` : null, () => {
+  // NOTE: the channel must be the owner's showcase channel (`showcase:<owner-slug>`,
+  // matching notify_fanout), not the project slug — subscribing to the project
+  // slug silently receives nothing.
+  const realtimeChannel = ownerSlug || effectiveSlug;
+  useRealtimeChannel(realtimeChannel ? `showcase:${realtimeChannel}` : null, () => {
     queryClient.invalidateQueries({ queryKey: ["telemetry-stats", effectiveSlug] });
   });
 

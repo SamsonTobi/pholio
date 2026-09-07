@@ -813,6 +813,7 @@ export default function ProjectEditorPage() {
             <TelemetryChart
               projectSlug={showcaseSlug}
               telemetrySlug={telemetrySlug}
+              ownerSlug={profileSlug}
             />
 
             <div className="border-t border-neutral-100 dark:border-neutral-800 pt-6">
