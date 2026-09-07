@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/shared/NotificationBell";
 import { ArrowUpRight } from "lucide-react";
 
 export default function DashboardLayout({
@@ -15,6 +16,7 @@ export default function DashboardLayout({
   const navItems = [
     { label: "Projects", href: "/dashboard/projects" },
     { label: "Showcases", href: "/dashboard/showcases" },
+    { label: "Hacker Groups", href: "/dashboard/hacker-groups" },
     { label: "Settings", href: "/dashboard/settings" },
   ];
 
@@ -39,7 +41,9 @@ export default function DashboardLayout({
                 const isActive =
                   pathname === item.href ||
                   (item.href === "/dashboard/projects" &&
-                    pathname.startsWith("/dashboard/projects"));
+                    pathname.startsWith("/dashboard/projects")) ||
+                  (item.href === "/dashboard/hacker-groups" &&
+                    pathname.startsWith("/dashboard/hacker-groups"));
                 return (
                   <Link
                     key={item.href}
@@ -58,6 +62,7 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <Link href="/tobi" target="_blank">
               <Button
                 variant="outline"
