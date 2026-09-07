@@ -81,6 +81,15 @@ describe("Database RLS Matrix (static policy pins)", () => {
     expect(sql034).toMatch(/'id', NEW\.(project_id|group_id)::text/);
   });
 
+  it("039 broadcasts project push-sync updates with a Worker-compatible payload", () => {
+    const sql039 = migrationSql("039_projects_fanout.sql");
+    expect(sql039).toMatch(/on public\.projects/);
+    expect(sql039).toMatch(/last_push_at/);
+    expect(sql039).toMatch(/'type', 'project_updated'/);
+    expect(sql039).toMatch(/'id', NEW\.id::text/);
+    expect(sql039).toMatch(/showcase:/);
+  });
+
   it("service-only tables expose no anon insert path", () => {
     const sql018 = migrationSql("018_telemetry_rls.sql");
     expect(sql018).toMatch(/service_role/);
