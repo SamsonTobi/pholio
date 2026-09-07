@@ -88,6 +88,18 @@ The WebSocket fanout server runs on Cloudflare Workers with Durable Objects:
 
 4. Configure `NEXT_PUBLIC_REALTIME_URL` in Next.js to point to `wss://[worker-name].[subdomain].workers.dev`.
 
+5. Set the fanout settings on the production database (required — without
+   these, `notify_fanout` keeps outbox rows but never dispatches to the
+   Worker; Postgres logs will show "dispatch skipped"). Run in the Supabase
+   SQL editor:
+   ```sql
+   alter database postgres set "app.settings.realtime_worker_url" = 'https://[worker-name].[subdomain].workers.dev';
+   alter database postgres set "app.settings.fanout_secret" = '<same-value-as-FANOUT_SECRET>';
+   ```
+   The `fanout_secret` must exactly match the Worker's `FANOUT_SECRET`
+   (`wrangler secret list`). Note the Worker URL here is `https://`, while
+   `NEXT_PUBLIC_REALTIME_URL` in the web app is the `wss://` equivalent.
+
 ---
 
 ## 5. Web Application Deployment (Vercel)
