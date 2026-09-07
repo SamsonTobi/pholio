@@ -1,5 +1,7 @@
+import * as React from "react";
 import Link from "next/link";
 import { projectDeepUrl } from "@/lib/env";
+import { StatPulse } from "./StatPulse";
 
 export interface IndexProjectRowProps {
   userSlug: string;
@@ -8,6 +10,8 @@ export interface IndexProjectRowProps {
   subtitle?: string | null;
   blurb?: string | null;
   thumbnails?: string[];
+  visitors7d?: number;
+  actives7d?: number;
 }
 
 export function IndexProjectRow({
@@ -17,23 +21,32 @@ export function IndexProjectRow({
   subtitle,
   blurb,
   thumbnails = [],
+  visitors7d,
+  actives7d,
 }: IndexProjectRowProps) {
   const href = `/${userSlug}/${projectSlug}`;
 
   return (
     <div className="py-5 border-b border-neutral-100 dark:border-neutral-900 space-y-2">
-      <div>
-        <Link
-          href={href}
-          className="font-semibold text-sm text-neutral-950 hover:underline underline-offset-4 dark:text-neutral-50"
-        >
-          {name}
-        </Link>
-        {subtitle && (
-          <span className="text-xs text-neutral-500 ml-2 dark:text-neutral-400">
-            {subtitle}
-          </span>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Link
+            href={href}
+            className="font-semibold text-sm text-neutral-950 hover:underline underline-offset-4 dark:text-neutral-50"
+          >
+            {name}
+          </Link>
+          {subtitle && (
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">
+              {subtitle}
+            </span>
+          )}
+        </div>
+        <StatPulse
+          projectSlug={projectSlug}
+          visitors7d={visitors7d}
+          actives7d={actives7d}
+        />
       </div>
 
       {blurb && (

@@ -1,3 +1,4 @@
+import * as React from "react";
 import { formatTimeAgo } from "@/lib/utils";
 
 export function TimeAgo({

@@ -1,7 +1,9 @@
+import * as React from "react";
 import { StatusPill } from "./StatusPill";
 import { DeviceFrame } from "./DeviceFrame";
 import { ExternalLink, Star } from "lucide-react";
 import { TimeAgo } from "./TimeAgo";
+import { StatPulse } from "./StatPulse";
 
 export interface StoryProjectProps {
   id: string;
@@ -17,6 +19,8 @@ export interface StoryProjectProps {
   mockupUrl?: string | null;
   mockupDevice?: "browser" | "phone" | "tablet";
   showcaseBodies?: string[];
+  visitors7d?: number;
+  actives7d?: number;
 }
 
 export function StoryProjectSection({
@@ -32,6 +36,8 @@ export function StoryProjectSection({
   mockupUrl,
   mockupDevice = "browser",
   showcaseBodies = [],
+  visitors7d,
+  actives7d,
 }: StoryProjectProps) {
   const displayTagline = tagline || description || "A product built for creators and engineers";
 
@@ -75,8 +81,13 @@ export function StoryProjectSection({
         </div>
 
         {/* Status pill & metadata row */}
-        <div className="flex items-center gap-3 text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-500">
           <StatusPill status="Shipped" />
+          <StatPulse
+            projectSlug={showcase_slug}
+            visitors7d={visitors7d}
+            actives7d={actives7d}
+          />
           {stars !== undefined && stars > 0 && (
             <span className="flex items-center gap-1 font-mono text-neutral-400">
               <Star className="h-3 w-3" /> {stars}
