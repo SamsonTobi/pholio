@@ -84,19 +84,19 @@ Services + UI:
 
 ## Phase 3 — Showcase templates (Story + Index)
 
-- [ ] 3.1 Implement shared `src/components/shared/TimeAgo.tsx`, `EmptyState.tsx`, `StatusPill.tsx` (`Shipped` green pill), `StatPulse.tsx` stub.
-- [ ] 3.2 Implement `DeviceFrame.tsx` (`browser|phone|tablet` frames, 16/9, rounded-2xl border shadow, `object-cover`).
-- [ ] 3.3 Implement `ShowcaseHeaderCard.tsx` (Variant A top card: 56px avatar, name 18 semibold, headline muted, right `Member`/`Joined MM/DD/YY` + `Chat` pill ghost with tooltip `Coming soon`, `mailto:` fallback, no chat backend).
-- [ ] 3.4 Implement `ProjectRail.tsx` (64px left rail, 40px rounded-xl icons from `icon_url` or initial tile, active ring, expand chevron, anchor scroll `#project-{showcase_slug}`).
-- [ ] 3.5 Implement `StoryProjectSection.tsx` (28px icon + H2 `{Name} – {Tagline}` + external link, `Shipped` + avatar stack, paragraphs `text-slate-600 leading-7 max-w-3xl`, hero `DeviceFrame browser`).
-- [ ] 3.6 Implement Variant A assembly in `app/[slug]/page.tsx` when `template=story`: `max-w-5xl grid-cols-[64px_1fr]`, sorted `last_push_at desc`, archived collapsed at bottom.
-- [ ] 3.7 Implement `IndexHeader.tsx`, `IndexTabs.tsx` (`Posts Information` left, `Compose ...` right; Compose -> dashboard composer, `...` owner menu, read-only for visitors), `IndexProjectRow.tsx` (underlined title, muted subtitle, blurb, thumbs row -> `[slug]/[projectSlug]`), `NowSection.tsx` (pinned latest showcase), `PreviouslySection.tsx` (archived + bio lines).
-- [ ] 3.8 Implement Variant B assembly (`max-w-xl`) when `template=index`.
-- [ ] 3.9 Implement `app/[slug]/[projectSlug]/page.tsx` deep view (reuse story section + full showcase timeline for project).
-- [ ] 3.10 Wire template switch in settings to revalidate `[slug]` (revalidatePath). Verify toggle changes public page.
-- [ ] 3.11 Responsive pass 360px + 1280px, light theme pixel-close to mockups. `next-themes` dark deferred (no dark QA blocking).
-- [ ] 3.12 Playwright: template toggle persists, anchors scroll, archived handling.
-- [ ] Acceptance 3: both variants render from same data, match mockup structure, responsive.
+- [x] 3.1 Implement shared `src/components/shared/TimeAgo.tsx`, `EmptyState.tsx`, `StatusPill.tsx` (`Shipped` green pill), `StatPulse.tsx` stub.
+- [x] 3.2 Implement `DeviceFrame.tsx` (`browser|phone|tablet` frames, 16/9, rounded-2xl border shadow, `object-cover`).
+- [x] 3.3 Implement `ShowcaseHeaderCard.tsx` (Variant A top card: 56px avatar, name 18 semibold, headline muted, right `Member`/`Joined MM/DD/YY` + `Chat` pill ghost with tooltip `Coming soon`, `mailto:` fallback, no chat backend).
+- [x] 3.4 Implement `ProjectRail.tsx` (64px left rail, 40px rounded-xl icons from `icon_url` or initial tile, active ring, expand chevron, anchor scroll `#project-{showcase_slug}`).
+- [x] 3.5 Implement `StoryProjectSection.tsx` (28px icon + H2 `{Name} – {Tagline}` + external link, `Shipped` + avatar stack, paragraphs `text-slate-600 leading-7 max-w-3xl`, hero `DeviceFrame browser`).
+- [x] 3.6 Implement Variant A assembly in `app/[slug]/page.tsx` when `template=story`: `max-w-5xl grid-cols-[64px_1fr]`, sorted `last_push_at desc`, archived collapsed at bottom.
+- [x] 3.7 Implement `IndexHeader.tsx`, `IndexTabs.tsx` (`Posts Information` left, `Compose ...` right; Compose -> dashboard composer, `...` owner menu, read-only for visitors), `IndexProjectRow.tsx` (underlined title, muted subtitle, blurb, thumbs row -> `[slug]/[projectSlug]`), `NowSection.tsx` (pinned latest showcase), `PreviouslySection.tsx` (archived + bio lines).
+- [x] 3.8 Implement Variant B assembly (`max-w-xl`) when `template=index`.
+- [x] 3.9 Implement `app/[slug]/[projectSlug]/page.tsx` deep view (reuse story section + full showcase timeline for project).
+- [x] 3.10 Wire template switch in settings to revalidate `[slug]` (revalidatePath). Verify toggle changes public page.
+- [x] 3.11 Responsive pass 360px + 1280px, light theme pixel-close to mockups. `next-themes` dark deferred (no dark QA blocking).
+- [x] 3.12 Playwright: template toggle persists, anchors scroll, archived handling.
+- [x] Acceptance 3: both variants render from same data, match mockup structure, responsive.
 
 ## Phase 4 — Mockups + showcases composer
 

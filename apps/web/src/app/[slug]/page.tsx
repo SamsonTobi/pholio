@@ -1,6 +1,15 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { getBySlug } from "@/features/profile/server/service";
+import { listProjectsByOwner } from "@/features/projects/server/service";
 import { APP_URL, showcaseUrl } from "@/lib/env";
+import { ShowcaseHeaderCard } from "@/components/shared/ShowcaseHeaderCard";
+import { ProjectRail } from "@/components/shared/ProjectRail";
+import { StoryProjectSection } from "@/components/shared/StoryProjectSection";
+import { IndexHeader } from "@/components/shared/IndexHeader";
+import { IndexTabs } from "@/components/shared/IndexTabs";
+import { IndexProjectRow } from "@/components/shared/IndexProjectRow";
+import { NowSection } from "@/components/shared/NowSection";
+import { PreviouslySection } from "@/components/shared/PreviouslySection";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -58,54 +67,123 @@ export default async function ShowcasePage({
     notFound();
   }
 
-  return (
-    <div className="min-h-screen py-10 px-4 sm:px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="bg-neutral-100/70 dark:bg-neutral-900/60 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border border-neutral-200/60 dark:border-neutral-800">
-          <div className="flex items-center gap-4">
-            {profile.avatar_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name || profile.slug}
-                className="h-14 w-14 rounded-full object-cover border border-neutral-300 dark:border-neutral-700"
+  const projects = await listProjectsByOwner(profile.id);
+  const activeProjects = projects.filter((p) => p.status !== "archived");
+  const archivedProjects = projects.filter((p) => p.status === "archived");
+
+  const latestShowcase = projects.flatMap((p) => p.latestShowcases || [])[0];
+
+  // Variant A: Story template
+  if (profile.template === "story") {
+    return (
+      <div className="min-h-screen py-10 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto space-y-10">
+          <ShowcaseHeaderCard
+            displayName={profile.display_name || profile.slug}
+            headline={profile.headline}
+            avatarUrl={profile.avatar_url}
+            siteUrl={profile.site_url}
+            joinedDate="01/15/26"
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-[64px_1fr] gap-8">
+            <div className="hidden md:block">
+              <ProjectRail
+                projects={activeProjects.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  showcase_slug: p.showcase_slug,
+                  icon_url: p.icon_url,
+                }))}
               />
-            )}
-            <div>
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">
-                {profile.display_name || profile.slug}
-              </h1>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                {profile.headline || "Product engineer"}
-              </p>
+            </div>
+
+            <div className="space-y-16">
+              {activeProjects.map((project) => (
+                <StoryProjectSection
+                  key={project.id}
+                  id={project.id}
+                  name={project.name}
+                  showcase_slug={project.showcase_slug}
+                  tagline={project.description}
+                  readme_summary={project.readme_summary}
+                  icon_url={project.icon_url}
+                  live_url={project.live_url}
+                  stars={project.stars}
+                  last_push_at={project.last_push_at}
+                  mockupDevice={project.mockup?.device || "browser"}
+                  showcaseBodies={project.latestShowcases?.map((s) => s.body) || []}
+                />
+              ))}
+
+              {archivedProjects.length > 0 && (
+                <div className="pt-8 border-t border-neutral-200 dark:border-neutral-800">
+                  <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-neutral-400 mb-4">
+                    Archived Projects
+                  </h3>
+                  <div className="space-y-3">
+                    {archivedProjects.map((p) => (
+                      <div key={p.id} className="text-xs text-neutral-500">
+                        {p.name} — {p.description}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          <div className="flex items-center gap-4 text-xs text-neutral-500">
-            <span className="px-2.5 py-1 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 font-mono">
-              Template: {profile.template}
-            </span>
-            {profile.site_url && (
-              <a
-                href={profile.site_url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-neutral-900 dark:hover:text-neutral-100"
-              >
-                Website
-              </a>
-            )}
-          </div>
+  // Variant B: Index template
+  return (
+    <div className="min-h-screen py-10 px-4 sm:px-6">
+      <div className="max-w-xl mx-auto space-y-6">
+        <IndexHeader
+          displayName={profile.display_name || profile.slug}
+          headline={profile.headline}
+          avatarUrl={profile.avatar_url}
+          siteUrl={profile.site_url}
+          joinedDate="01/15/26"
+        />
+
+        <IndexTabs isOwner={true} />
+
+        <NowSection
+          body={latestShowcase?.body || "Shipping the core foundation and telemetry tracker."}
+          date={latestShowcase?.published_at}
+        />
+
+        <div className="space-y-1">
+          <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-neutral-400 pt-4">
+            Projects
+          </h3>
+          {activeProjects.map((project) => (
+            <IndexProjectRow
+              key={project.id}
+              userSlug={profile.slug}
+              projectSlug={project.showcase_slug}
+              name={project.name}
+              subtitle={project.language}
+              blurb={project.description}
+              thumbnails={[
+                "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&q=80",
+                "https://images.unsplash.com/photo-1555774698-0b77e0d5fac6?auto=format&fit=crop&w=400&q=80",
+              ]}
+            />
+          ))}
         </div>
 
-        <div className="mt-8 text-center text-sm text-neutral-500 py-16 border border-dashed border-neutral-200 rounded-2xl dark:border-neutral-800">
-          <p className="font-medium text-neutral-700 dark:text-neutral-300">
-            Showcase template shell loaded ({profile.template})
-          </p>
-          <p className="text-xs mt-1 text-neutral-400">
-            Full Story & Index templates implement in Phase 3.
-          </p>
-        </div>
+        <PreviouslySection
+          bioLines={["Previously built developer tools, WebSockets, and real-time distributed systems."]}
+          archivedProjects={archivedProjects.map((p) => ({
+            id: p.id,
+            name: p.name,
+            year: "2025",
+          }))}
+        />
       </div>
     </div>
   );
