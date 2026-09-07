@@ -9,6 +9,7 @@ export interface ApiKeyItem {
   scopes: string[];
   created_at: string;
   revoked_at: string | null;
+  last_used_at: string | null;
 }
 
 export interface StoredApiKey extends ApiKeyItem {
@@ -169,6 +170,7 @@ export async function generateApiKey({
     scopes: normalizedScopes,
     created_at: insertedCreatedAt,
     revoked_at: null,
+    last_used_at: null,
   };
 
   inMemoryApiKeys.set(prefix, storedKey);
@@ -191,7 +193,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyItem[]> {
     try {
       const admin = createAdminClient();
       const { data, error } = await (admin.from("api_keys") as any)
-        .select("id, name, prefix, scopes, created_at, revoked_at")
+        .select("id, name, prefix, scopes, created_at, revoked_at, last_used_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
@@ -203,6 +205,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyItem[]> {
           scopes: k.scopes || [],
           created_at: k.created_at,
           revoked_at: k.revoked_at,
+          last_used_at: k.last_used_at ?? null,
         }));
       }
     } catch {
@@ -220,6 +223,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyItem[]> {
       scopes: k.scopes,
       created_at: k.created_at,
       revoked_at: k.revoked_at,
+      last_used_at: k.last_used_at ?? null,
     }));
 }
 
@@ -265,6 +269,27 @@ export async function revokeApiKey({
 }
 
 /**
+ * Records first/ongoing usage so the agent setup banner can retire once
+ * the user's agent connects. Best-effort: never fails verification.
+ */
+async function touchLastUsed(prefix: string): Promise<void> {
+  const now = new Date().toISOString();
+  const record = inMemoryApiKeys.get(prefix);
+  if (record) record.last_used_at = now;
+  if (isSupabaseLive()) {
+    try {
+      const admin = createAdminClient();
+      await (admin.from("api_keys") as any)
+        .update({ last_used_at: now })
+        .eq("prefix", prefix)
+        .is("last_used_at", null);
+    } catch {
+      // Usage tracking must never break auth
+    }
+  }
+}
+
+/**
  * Verifies an API key token.
  * Extracts prefix, computes SHA-256 hash, uses timingSafeEqual comparison.
  * Returns { userId, scopes } if valid and not revoked, null otherwise.
@@ -296,6 +321,7 @@ export async function verifyApiKey(
           return null;
         }
         if (timingSafeEqualCompare(computedHash, data.key_hash)) {
+          await touchLastUsed(prefix);
           return {
             userId: data.user_id,
             scopes: data.scopes || ["showcase:write"],
@@ -315,6 +341,7 @@ export async function verifyApiKey(
       return null;
     }
     if (timingSafeEqualCompare(computedHash, inMemory.key_hash)) {
+      await touchLastUsed(prefix);
       return {
         userId: inMemory.user_id,
         scopes: inMemory.scopes || ["showcase:write"],

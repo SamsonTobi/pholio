@@ -182,5 +182,20 @@ describe("Agent Keys Feature", () => {
 
       timingSafeEqualSpy.mockRestore();
     });
+
+    it("records last_used_at on first successful verification", async () => {
+      const generated = await generateApiKey({
+        userId: testUserId,
+        name: "Usage Tracking Candidate",
+      });
+
+      const before = await listApiKeys(testUserId);
+      expect(before.find((k) => k.id === generated.id)?.last_used_at).toBeNull();
+
+      expect(await verifyApiKey(generated.token)).not.toBeNull();
+
+      const after = await listApiKeys(testUserId);
+      expect(after.find((k) => k.id === generated.id)?.last_used_at).not.toBeNull();
+    });
   });
 });
