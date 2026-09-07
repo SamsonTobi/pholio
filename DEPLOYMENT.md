@@ -12,9 +12,11 @@ Set up the production environment variables in your deployment platform (e.g. Ve
 | `NEXT_PUBLIC_TRACKER_URL` | Hosted telemetry snippet URL | `https://your-domain.com/tracker.js` |
 | `NEXT_PUBLIC_REALTIME_URL` | Cloudflare Worker WebSocket endpoint | `wss://realtime.your-domain.workers.dev` |
 | `REALTIME_FANOUT_SECRET` | Shared secret between Supabase & Worker | Secure high-entropy random string |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | `https://[PROJECT-REF].supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`| Supabase public anon key | `eyJhbGciOi...` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key for admin tasks | `eyJhbGciOi...` |
+| `SUPABASE_URL` | Supabase project URL | `https://[PROJECT-REF].supabase.co` |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key | `sb_publishable_...` |
+| `SUPABASE_SECRET_KEY` | Supabase secret key for admin tasks | `sb_secret_...` |
+| `SUPABASE_JWKS_URL` | Supabase JWT signing-key discovery URL | `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` |
+| `SUPABASE_AUTH_CALLBACK_URL` | Supabase OAuth provider callback | `${SUPABASE_URL}/auth/v1/callback` |
 | `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID | GitHub Developer Settings |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret | GitHub Developer Settings |
 | `GITHUB_WEBHOOK_SECRET` | Secret for verifying GitHub webhooks | High-entropy random string |

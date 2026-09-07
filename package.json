@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "dev": "bun --filter web dev",
-    "check": "bun --filter web check && bun --filter @pholio/shared check && bun --filter @pholio/tracker check && ./scripts/check-banned-terms.sh",
-    "test": "bun --filter web test",
+    "check": "bun --filter web check && bun --filter @pholio/shared check && bun --filter @pholio/tracker check && bun --filter @pholio/mcp-server check && ./scripts/check-banned-terms.sh",
+    "test": "bun --filter web test && bun --filter @pholio/mcp-server test",
     "lint": "bun --filter web lint"
   }
 }
