@@ -200,14 +200,14 @@ Frontend:
 
 ## Phase 8 — MCP + agent docs
 
-- [ ] 8.1 Migration `031_api_keys`: `api_keys(id uuid primary key default gen_random_uuid(), user_id uuid references profiles(id) on delete cascade, name text, prefix text not null, key_hash text not null, scopes text[] default '{showcase:write}', revoked_at timestamptz, created_at timestamptz default now())`. Index `(user_id)`, unique `(prefix)`. RLS owner select, no anon.
-- [ ] 8.2 Implement `src/features/agent-keys/server/service.ts`: `generate(name)` returns plaintext once (`PHOLIO_...`, store `prefix` + `sha256`), `list` (prefix only), `revoke`. Constant-time compare helper.
-- [ ] 8.3 Implement settings `app/dashboard/api-keys/page.tsx`: generate/revoke, `Copy once — it won't be shown again.` warning.
-- [ ] 8.4 Define `packages/shared/mcpSchemas.ts` zod for all 6 tools (see plan §12, body 10..600).
-- [ ] 8.5 Implement `/api/mcp` Streamable HTTP via `@modelcontextprotocol/sdk`: Bearer auth, scope check, route to existing services (`projects.update`, `showcases.publish`, `github-sync.reparse`, `mockups.upload(base64)`, `telemetry.getStats`, `leaderboard.get`). Thin wrapper only.
-- [ ] 8.6 Implement `app/docs/agent/page.tsx`: dynamic MCP JSON with `NEXT_PUBLIC_APP_URL` + `PHOLIO_BASE_URL`, copy buttons, master prompt block, tool table.
+- [x] 8.1 Migration `031_api_keys`: `api_keys(id uuid primary key default gen_random_uuid(), user_id uuid references profiles(id) on delete cascade, name text, prefix text not null, key_hash text not null, scopes text[] default '{showcase:write}', revoked_at timestamptz, created_at timestamptz default now())`. Index `(user_id)`, unique `(prefix)`. RLS owner select, no anon.
+- [x] 8.2 Implement `src/features/agent-keys/server/service.ts`: `generate(name)` returns plaintext once (`PHOLIO_...`, store `prefix` + `sha256`), `list` (prefix only), `revoke`. Constant-time compare helper.
+- [x] 8.3 Implement settings `app/dashboard/api-keys/page.tsx`: generate/revoke, `Copy once — it won't be shown again.` warning.
+- [x] 8.4 Define `packages/shared/mcpSchemas.ts` zod for all 6 tools (see plan §12, body 10..600).
+- [x] 8.5 Implement `/api/mcp` Streamable HTTP via `@modelcontextprotocol/sdk`: Bearer auth, scope check, route to existing services (`projects.update`, `showcases.publish`, `github-sync.reparse`, `mockups.upload(base64)`, `telemetry.getStats`, `leaderboard.get`). Thin wrapper only.
+- [x] 8.6 Implement `app/docs/agent/page.tsx`: dynamic MCP JSON with `NEXT_PUBLIC_APP_URL` + `PHOLIO_BASE_URL`, copy buttons, master prompt block, tool table.
 - [ ] 8.7 Add `packages/mcp-server` thin wrapper (`npx -y @pholio/mcp-server` entry) re-exporting schemas + client pointing at `PHOLIO_BASE_URL`. Document publish later.
-- [ ] 8.8 E2E: with fresh API key, MCP client updates project + publishes showcase + syncs README + fetches stats/leaderboard.
+- [x] 8.8 E2E: with fresh API key, MCP client updates project + publishes showcase + syncs README + fetches stats/leaderboard.
 - [ ] Acceptance 8: Cursor with key completes full loop without dashboard.
 
 ## Phase 9 — Hardening, tests, deploy
