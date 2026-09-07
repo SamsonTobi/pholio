@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useDashboardUIStore, StatusFilter } from "@/stores/dashboard-ui";
+import { useRealtimeChannel } from "@/lib/realtime-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,24 @@ export default function ProjectsDashboardPage() {
       cancelled = true;
     };
   }, []);
+
+  const reloadProjects = useCallback(async () => {
+    try {
+      const projectsRes = await fetch("/api/projects");
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json();
+        setProjects(projectsData.projects || []);
+      }
+    } catch {
+      // Keep the stale list; the manual resync button stays as fallback.
+    }
+  }, []);
+
+  // Live updates: the GitHub webhook / resync bumps `last_push_at`, which the
+  // projects fanout trigger broadcasts on the owner's showcase channel.
+  useRealtimeChannel(profileSlug ? `showcase:${profileSlug}` : null, () => {
+    reloadProjects();
+  });
 
   const handleResync = async (projectId: string) => {
     setSyncingId(projectId);
