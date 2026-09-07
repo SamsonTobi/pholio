@@ -41,8 +41,11 @@ export function MarketingFooter() {
           <Link href="/login" className="hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">
             Login
           </Link>
-          <Link href="/docs/agent" className="hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">
-            Agent Docs
+          <Link href="/agents.md" className="hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">
+            For Agents
+          </Link>
+          <Link href="/llms.txt" className="hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">
+            llms.txt
           </Link>
         </div>
       </div>
