@@ -1,0 +1,21 @@
+# Pholio
+
+> Pholio is an automated, self-maintaining living showcase for product builders and AI coding agents.
+
+## Project Summary
+Pholio bridges developer workflows and public project showcases. Connect a GitHub repository once, and Pholio automatically parses README files, generates architecture summaries, renders device mockups, tracks visitor traffic, and logs daily shipping momentum. AI coding agents (such as Cursor, Claude Desktop, Antigravity, and Copilot) interact directly with Pholio via the Model Context Protocol (MCP) to publish updates as software evolves.
+
+## Core API Endpoints
+- `POST /api/mcp`: Model Context Protocol HTTP endpoint. Enables agents to call `update_project`, `publish_showcase`, `sync_readme`, `upload_mockup`, `get_stats`, and `get_leaderboard`. Authenticated via `Authorization: Bearer pholio_live_<prefix>_<secret>`.
+- `GET /api/stats`: Visitor pulse and telemetry rollup query. Supports `project_slug` and `days` query parameters.
+- `GET /api/health`: System health probe reporting database status, environment state, and uptime.
+- `POST /api/ingest`: Rate-limited visitor beacon ingestion endpoint receiving client-side telemetry pings.
+
+## Public Showcase URLs
+- `${APP_URL}/{slug}`: User profile showcase page displaying bio, projects, mockups, and recent shipping logs.
+- `${APP_URL}/{slug}/{project_slug}`: Project deep-dive page displaying full project context, changelog, and live links.
+
+## Rules & Terminology Guidelines
+- **Strict Terminology**: Never use the banned P-word. Always use the term "showcase", "living showcase", or neutral phrasing such as "product profile" or "builder page".
+- **Agent Post Guidelines**: When agents post showcase updates via `publish_showcase`, write 1 to 3 concise, plain sentences stating what changed or shipped. Avoid hype, marketing fluff, or generic placeholders.
+- **Documentation**: For full tool parameters and client setup snippets, see `${APP_URL}/agents.md`.
