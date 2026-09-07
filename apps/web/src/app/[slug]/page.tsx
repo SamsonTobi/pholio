@@ -13,6 +13,9 @@ import { NowSection } from "@/components/shared/NowSection";
 import { PreviouslySection } from "@/components/shared/PreviouslySection";
 import { getLatestPinnedShowcase } from "@/features/showcases/server/service";
 import { ShowcaseRealtimeListener } from "@/components/shared/ShowcaseRealtimeListener";
+import { AgentSetupBanner } from "@/components/shared/AgentSetupBanner";
+import { SiteNav } from "@/components/shared/SiteNav";
+import { listApiKeys } from "@/features/agent-keys/server/service";
 import type { Metadata } from "next";
 
 function formatJoinedDate(createdAt: string | null | undefined): string | null {
@@ -115,6 +118,19 @@ export default async function ShowcasePage({
   ]);
 
   const isOwner = Boolean(sessionUser && sessionUser.id === profile.id);
+  // Owner-only agent setup banner, retired once any key is used.
+  const agentConnected = isOwner
+    ? (await listApiKeys(profile.id).catch(() => [])).some(
+        (k) => !k.revoked_at && k.last_used_at
+      )
+    : false;
+  const showAgentBanner = isOwner && !agentConnected;
+  const navProps = {
+    isLoggedIn: Boolean(sessionUser),
+    email: sessionUser?.email ?? null,
+    avatarUrl: (sessionUser?.user_metadata?.avatar_url as string | undefined) ?? null,
+    showcaseHref: isOwner ? `/${profile.slug}` : null,
+  };
   const activeProjects = projects.filter((p) => p.status !== "archived");
   const archivedProjects = projects.filter((p) => p.status === "archived");
 
@@ -124,9 +140,12 @@ export default async function ShowcasePage({
   // Variant A: Story template
   if (profile.template === "story") {
     return (
-      <div className="min-h-screen py-10 px-4 sm:px-6">
+      <div className="min-h-screen">
+        <SiteNav {...navProps} />
+      <div className="py-10 px-4 sm:px-6">
         <ShowcaseRealtimeListener slug={profile.slug} />
         <div className="max-w-5xl mx-auto space-y-10">
+          {showAgentBanner && <AgentSetupBanner appUrl={APP_URL} />}
           <ShowcaseHeaderCard
             displayName={profile.display_name || profile.slug}
             headline={profile.headline}
@@ -195,15 +214,19 @@ export default async function ShowcasePage({
           </div>
         </div>
       </div>
+    </div>
     );
   }
 
   // Variant B: Index template
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6">
-      <ShowcaseRealtimeListener slug={profile.slug} />
-      <div className="max-w-xl mx-auto space-y-6">
-        <IndexHeader
+    <div className="min-h-screen">
+      <SiteNav {...navProps} />
+      <div className="py-10 px-4 sm:px-6">
+        <ShowcaseRealtimeListener slug={profile.slug} />
+        <div className="max-w-xl mx-auto space-y-6">
+          {showAgentBanner && <AgentSetupBanner appUrl={APP_URL} />}
+          <IndexHeader
           displayName={profile.display_name || profile.slug}
           headline={profile.headline}
           avatarUrl={profile.avatar_url}
@@ -251,8 +274,9 @@ export default async function ShowcasePage({
             name: p.name,
             year: projectYear(p.last_push_at || p.created_at),
             href: `/${profile.slug}/${p.showcase_slug}`,
-          }))}
+          }          ))}
         />
+      </div>
       </div>
     </div>
   );
