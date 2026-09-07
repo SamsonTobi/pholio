@@ -59,28 +59,28 @@ Auth + app:
 
 Migrations:
 
-- [ ] 2.1 Migration `006_projects`: `projects(id uuid primary key default gen_random_uuid(), owner_id uuid references profiles(id) on delete cascade, github_repo_id bigint, github_full_name text, name text not null, showcase_slug text not null, description text, readme_summary text, icon_url text, tags text[] default '{}', language text, stars int default 0, live_url text, status text default 'active' check (status in ('active','archived')), last_push_at timestamptz, telemetry_slug text unique not null, created_at timestamptz default now(), unique(owner_id, github_repo_id))`. Indexes `(owner_id)`, `(telemetry_slug)`, `(last_push_at desc)`.
-- [ ] 2.2 Migration `007_github_sync_events`: `github_sync_events(id bigint generated always as identity primary key, project_id uuid references projects(id) on delete cascade, owner_id uuid, event_type text check (event_type in ('push','release','manual','cron','import')), pushed_at timestamptz default now(), commit_sha text, created_at timestamptz default now())`. Index `(project_id, pushed_at desc)`, `(owner_id, pushed_at desc)` for scoring.
-- [ ] 2.3 Migration `008_projects_rls`: enable RLS. Public select projects (showcase is public — V1 all public). Owner insert/update/delete where `auth.uid()=owner_id`.
-- [ ] 2.4 Storage: create bucket `logos` (public read). Policy: public select; authenticated insert/update where path starts with `{auth.uid()}/`.
-- [ ] 2.5 Migration `009_cron_backfill_stub`: schedule placeholder `daily-github-resync` via `pg_cron` (full body in 2.16).
+- [x] 2.1 Migration `006_projects`: `projects(id uuid primary key default gen_random_uuid(), owner_id uuid references profiles(id) on delete cascade, github_repo_id bigint, github_full_name text, name text not null, showcase_slug text not null, description text, readme_summary text, icon_url text, tags text[] default '{}', language text, stars int default 0, live_url text, status text default 'active' check (status in ('active','archived')), last_push_at timestamptz, telemetry_slug text unique not null, created_at timestamptz default now(), unique(owner_id, github_repo_id))`. Indexes `(owner_id)`, `(telemetry_slug)`, `(last_push_at desc)`.
+- [x] 2.2 Migration `007_github_sync_events`: `github_sync_events(id bigint generated always as identity primary key, project_id uuid references projects(id) on delete cascade, owner_id uuid, event_type text check (event_type in ('push','release','manual','cron','import')), pushed_at timestamptz default now(), commit_sha text, created_at timestamptz default now())`. Index `(project_id, pushed_at desc)`, `(owner_id, pushed_at desc)` for scoring.
+- [x] 2.3 Migration `008_projects_rls`: enable RLS. Public select projects (showcase is public — V1 all public). Owner insert/update/delete where `auth.uid()=owner_id`.
+- [x] 2.4 Storage: create bucket `logos` (public read). Policy: public select; authenticated insert/update where path starts with `{auth.uid()}/`.
+- [x] 2.5 Migration `009_cron_backfill_stub`: schedule placeholder `daily-github-resync` via `pg_cron` (full body in 2.16).
 
 Services + UI:
 
-- [ ] 2.6 Implement `src/lib/github.ts` Octokit factory (uses user provider_token server-side, app token fallback). Helpers `listRepos`, `getReadme`, `getRepo`, `treePaths`.
-- [ ] 2.7 Implement `src/features/github-sync/server/readme.ts`: fetch `README.md`, strip markdown to summary (first 2–3 sentences + stack bullets), extract homepage/live URL, tags heuristic. Unit fixtures.
-- [ ] 2.8 Implement `src/features/github-sync/server/icons.ts` resolver in order: repo root logo files -> web manifest largest icon -> favicon/link-icon -> mobile markers (Android `mipmap-xxxhdpi/ic_launcher.png` fallback xxhdpi / `AndroidManifest android:icon` / expo adaptiveIcon; iOS `AppIcon.appiconset` largest / `Info.plist` / expo ios icon; Expo `app.json expo.icon`; Flutter `assets/icon`/`pubspec`) -> org avatar -> initial tile (deterministic hue). Download to `logos/{owner_id}/{project_id}/*`, return public URL to `icon_url`. Re-resolve only if push touches icon paths.
-- [ ] 2.9 Vitest icons with 4 fixtures: web-only, expo, native android/ios, no-icon fallback.
-- [ ] 2.10 Implement `src/features/github-sync/server/service.ts`: `listImportableRepos` (sorted `pushed_at desc, stars desc`), `importRepos(repo_full_names[])` (creates projects + `telemetry_slug` nanoid + initial showcase draft `source=github` + sync event), `reparseProject(project_id)` (refresh stars/language/push/README/icon).
-- [ ] 2.11 Implement zod `importSchema`, `resyncSchema` in `github-sync/server/schema.ts`.
-- [ ] 2.12 Implement zustand `src/stores/onboarding.ts` (selected `repo_full_name[]`, toggle, pre-check top 3).
-- [ ] 2.13 Implement `app/(onboarding)/pick-repos/page.tsx`: exact copy `Pick what to showcase` + sub, repo list with stars/language/pushed ago, private opt-in toggle (progressive `repo` scope notice), Confirm -> import -> redirect `${APP_URL}/{slug}`. Empty state verbatim.
-- [ ] 2.14 Implement `POST /api/github/import` (auth, zod) -> service. Returns created projects.
-- [ ] 2.15 Implement `POST /api/github/resync` (auth, `{project_id}` ownership check) -> reparse.
-- [ ] 2.16 Implement `POST /api/webhooks/github` (verify `x-hub-signature-256` HMAC `GITHUB_WEBHOOK_SECRET`): on `push`/`release` update `last_push_at`, insert `github_sync_events`, trigger async reparse + auto-draft showcase (unpublished). Return 200 fast.
-- [ ] 2.17 Implement `pg_cron` daily job `daily-github-resync`: for projects with `last_push_at < now()-24h`, touch for reparse (calls service via `net.http_post` to `/api/github/resync-batch` with service secret, or direct SQL timestamp — pick one, document). Wire schedule in migration.
-- [ ] 2.18 Implement dashboard per-project `Resync` button + `Updated X ago` (`TimeAgo` shared).
-- [ ] Acceptance 2: pick 3 repos -> cards show stars/language/Updated ago + icons (incl. one mobile-icon case).
+- [x] 2.6 Implement `src/lib/github.ts` Octokit factory (uses user provider_token server-side, app token fallback). Helpers `listRepos`, `getReadme`, `getRepo`, `treePaths`.
+- [x] 2.7 Implement `src/features/github-sync/server/readme.ts`: fetch `README.md`, strip markdown to summary (first 2–3 sentences + stack bullets), extract homepage/live URL, tags heuristic. Unit fixtures.
+- [x] 2.8 Implement `src/features/github-sync/server/icons.ts` resolver in order: repo root logo files -> web manifest largest icon -> favicon/link-icon -> mobile markers (Android `mipmap-xxxhdpi/ic_launcher.png` fallback xxhdpi / `AndroidManifest android:icon` / expo adaptiveIcon; iOS `AppIcon.appiconset` largest / `Info.plist` / expo ios icon; Expo `app.json expo.icon`; Flutter `assets/icon`/`pubspec`) -> org avatar -> initial tile (deterministic hue). Download to `logos/{owner_id}/{project_id}/*`, return public URL to `icon_url`. Re-resolve only if push touches icon paths.
+- [x] 2.9 Vitest icons with 4 fixtures: web-only, expo, native android/ios, no-icon fallback.
+- [x] 2.10 Implement `src/features/github-sync/server/service.ts`: `listImportableRepos` (sorted `pushed_at desc, stars desc`), `importRepos(repo_full_names[])` (creates projects + `telemetry_slug` nanoid + initial showcase draft `source=github` + sync event), `reparseProject(project_id)` (refresh stars/language/push/README/icon).
+- [x] 2.11 Implement zod `importSchema`, `resyncSchema` in `github-sync/server/schema.ts`.
+- [x] 2.12 Implement zustand `src/stores/onboarding.ts` (selected `repo_full_name[]`, toggle, pre-check top 3).
+- [x] 2.13 Implement `app/(onboarding)/pick-repos/page.tsx`: exact copy `Pick what to showcase` + sub, repo list with stars/language/pushed ago, private opt-in toggle (progressive `repo` scope notice), Confirm -> import -> redirect `${APP_URL}/{slug}`. Empty state verbatim.
+- [x] 2.14 Implement `POST /api/github/import` (auth, zod) -> service. Returns created projects.
+- [x] 2.15 Implement `POST /api/github/resync` (auth, `{project_id}` ownership check) -> reparse.
+- [x] 2.16 Implement `POST /api/webhooks/github` (verify `x-hub-signature-256` HMAC `GITHUB_WEBHOOK_SECRET`): on `push`/`release` update `last_push_at`, insert `github_sync_events`, trigger async reparse + auto-draft showcase (unpublished). Return 200 fast.
+- [x] 2.17 Implement `pg_cron` daily job `daily-github-resync`: for projects with `last_push_at < now()-24h`, touch for reparse (calls service via `net.http_post` to `/api/github/resync-batch` with service secret, or direct SQL timestamp — pick one, document). Wire schedule in migration.
+- [x] 2.18 Implement dashboard per-project `Resync` button + `Updated X ago` (`TimeAgo` shared).
+- [x] Acceptance 2: pick 3 repos -> cards show stars/language/Updated ago + icons (incl. one mobile-icon case).
 
 ## Phase 3 — Showcase templates (Story + Index)
 

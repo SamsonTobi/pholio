@@ -111,6 +111,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      github_sync_events: {
+        Row: {
+          id: number;
+          project_id: string | null;
+          owner_id: string | null;
+          event_type: "push" | "release" | "manual" | "cron" | "import" | null;
+          pushed_at: string;
+          commit_sha: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          project_id?: string | null;
+          owner_id?: string | null;
+          event_type?: "push" | "release" | "manual" | "cron" | "import" | null;
+          pushed_at?: string;
+          commit_sha?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          project_id?: string | null;
+          owner_id?: string | null;
+          event_type?: "push" | "release" | "manual" | "cron" | "import" | null;
+          pushed_at?: string;
+          commit_sha?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       showcases: {
         Row: {
           id: string;
