@@ -43,6 +43,7 @@ export const env = parseEnv();
 
 export const APP_URL = env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
 export const TRACKER_URL = env.NEXT_PUBLIC_TRACKER_URL;
+export const NEXT_PUBLIC_TRACKER_URL = env.NEXT_PUBLIC_TRACKER_URL;
 export const REALTIME_URL = env.NEXT_PUBLIC_REALTIME_URL;
 
 export function showcaseUrl(slug: string): string {
