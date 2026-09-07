@@ -102,24 +102,24 @@ Services + UI:
 
 Migrations:
 
-- [ ] 4.1 Migration `010_showcases`: `showcases(id uuid primary key default gen_random_uuid(), project_id uuid references projects(id) on delete cascade, owner_id uuid references profiles(id) on delete cascade, body text check (char_length(body) between 10 and 600), meta jsonb default '{}', published_at timestamptz default now(), source text check (source in ('github','agent','manual')))`. Indexes `(project_id, published_at desc)`, `(owner_id, published_at desc)`.
-- [ ] 4.2 Migration `011_mockups`: `mockups(id uuid primary key default gen_random_uuid(), project_id uuid references projects(id) on delete cascade, storage_path text not null, device text check (device in ('browser','phone','tablet')), sort int default 0)`. Index `(project_id, sort)`.
-- [ ] 4.3 Migration `012_showcases_mockups_rls`: RLS — public select published showcases + mockups of public projects; owner CRUD where `auth.uid()=owner_id` (via projects.owner_id join check).
-- [ ] 4.4 Storage: bucket `mockups` (public read). Policies: public select; owner insert/update/delete under `mockups/{auth.uid()}/{project_id}/*`.
+- [x] 4.1 Migration `010_showcases`: `showcases(id uuid primary key default gen_random_uuid(), project_id uuid references projects(id) on delete cascade, owner_id uuid references profiles(id) on delete cascade, body text check (char_length(body) between 10 and 600), meta jsonb default '{}', published_at timestamptz default now(), source text check (source in ('github','agent','manual')))`. Indexes `(project_id, published_at desc)`, `(owner_id, published_at desc)`.
+- [x] 4.2 Migration `011_mockups`: `mockups(id uuid primary key default gen_random_uuid(), project_id uuid references projects(id) on delete cascade, storage_path text not null, device text check (device in ('browser','phone','tablet')), sort int default 0)`. Index `(project_id, sort)`.
+- [x] 4.3 Migration `012_showcases_mockups_rls`: RLS — public select published showcases + mockups of public projects; owner CRUD where `auth.uid()=owner_id` (via projects.owner_id join check).
+- [x] 4.4 Storage: bucket `mockups` (public read). Policies: public select; owner insert/update/delete under `mockups/{auth.uid()}/{project_id}/*`.
 
 Services + UI + API:
 
-- [ ] 4.5 `src/features/showcases/server/schema.ts` zod (`body` 10..600, `project_id`, `source`).
-- [ ] 4.6 `src/features/showcases/server/service.ts` (`publish`, `update`, `remove`, `listByProject`, `listByOwner`, `pinNow` flag in meta).
-- [ ] 4.7 `src/features/mockups/server/schema.ts` + `service.ts` (`upload` validates png/jpg/webp/svg <5MB, writes Storage, row; `setDevice`, `reorder`, `remove`).
-- [ ] 4.8 `POST/GET/PATCH/DELETE /api/showcases` thin routes (auth for writes, zod, ownership).
-- [ ] 4.9 `POST/DELETE /api/mockups` + `PATCH /api/mockups/device` (multipart via Server Action preferred; API fallback for MCP binary via base64).
-- [ ] 4.10 Dashboard `app/dashboard/showcases/page.tsx` timeline (drafts from pushes + published, one-click Publish, edit inline, pin to Now).
-- [ ] 4.11 Dashboard `app/dashboard/projects/[id]/page.tsx`: edit name/tagline/description/tags/live_url/status, mockup drag-drop + device toggle + sort, Resync, snippet link.
-- [ ] 4.12 Dashboard `app/dashboard/projects/page.tsx` list with filters (zustand `dashboard-ui`: search, status).
-- [ ] 4.13 Bind Now/Previously: Now = pinned showcase selector; Previously = archived projects + free-text bio lines on profile (`bio_previously` — add column in migration `013_profile_bio` if missing).
-- [ ] 4.14 Vitest: body length validation, pin logic, mockup sort.
-- [ ] Acceptance 4: upload appears framed on public page; publish appears in feed + Now if pinned.
+- [x] 4.5 `src/features/showcases/server/schema.ts` zod (`body` 10..600, `project_id`, `source`).
+- [x] 4.6 `src/features/showcases/server/service.ts` (`publish`, `update`, `remove`, `listByProject`, `listByOwner`, `pinNow` flag in meta).
+- [x] 4.7 `src/features/mockups/server/schema.ts` + `service.ts` (`upload` validates png/jpg/webp/svg <5MB, writes Storage, row; `setDevice`, `reorder`, `remove`).
+- [x] 4.8 `POST/GET/PATCH/DELETE /api/showcases` thin routes (auth for writes, zod, ownership).
+- [x] 4.9 `POST/DELETE /api/mockups` + `PATCH /api/mockups/device` (multipart via Server Action preferred; API fallback for MCP binary via base64).
+- [x] 4.10 Dashboard `app/dashboard/showcases/page.tsx` timeline (drafts from pushes + published, one-click Publish, edit inline, pin to Now).
+- [x] 4.11 Dashboard `app/dashboard/projects/[id]/page.tsx`: edit name/tagline/description/tags/live_url/status, mockup drag-drop + device toggle + sort, Resync, snippet link.
+- [x] 4.12 Dashboard `app/dashboard/projects/page.tsx` list with filters (zustand `dashboard-ui`: search, status).
+- [x] 4.13 Bind Now/Previously: Now = pinned showcase selector; Previously = archived projects + free-text bio lines on profile (`bio_previously` — add column in migration `013_profile_bio` if missing).
+- [x] 4.14 Vitest: body length validation, pin logic, mockup sort.
+- [x] Acceptance 4: upload appears framed on public page; publish appears in feed + Now if pinned.
 
 ## Phase 5 — Telemetry (7-day, tracker + ingest + rollup)
 

@@ -10,6 +10,7 @@ import { IndexTabs } from "@/components/shared/IndexTabs";
 import { IndexProjectRow } from "@/components/shared/IndexProjectRow";
 import { NowSection } from "@/components/shared/NowSection";
 import { PreviouslySection } from "@/components/shared/PreviouslySection";
+import { getLatestPinnedShowcase } from "@/features/showcases/server/service";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -71,7 +72,8 @@ export default async function ShowcasePage({
   const activeProjects = projects.filter((p) => p.status !== "archived");
   const archivedProjects = projects.filter((p) => p.status === "archived");
 
-  const latestShowcase = projects.flatMap((p) => p.latestShowcases || [])[0];
+  const pinnedShowcase = await getLatestPinnedShowcase(profile.id).catch(() => null);
+  const latestShowcase = pinnedShowcase || projects.flatMap((p) => p.latestShowcases || [])[0];
 
   // Variant A: Story template
   if (profile.template === "story") {
@@ -177,7 +179,14 @@ export default async function ShowcasePage({
         </div>
 
         <PreviouslySection
-          bioLines={["Previously built developer tools, WebSockets, and real-time distributed systems."]}
+          bioLines={
+            profile.bio_previously
+              ? profile.bio_previously
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter(Boolean)
+              : ["Previously built developer tools, WebSockets, and real-time distributed systems."]
+          }
           archivedProjects={archivedProjects.map((p) => ({
             id: p.id,
             name: p.name,

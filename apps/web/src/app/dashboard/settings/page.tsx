@@ -10,6 +10,9 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState("Tobi Samson");
   const [headline, setHeadline] = useState("Product engineer");
   const [siteUrl, setSiteUrl] = useState("https://samsontobi.dev");
+  const [bioPreviously, setBioPreviously] = useState(
+    "Co-founded Paystack mobile, earlier at Konga engineering."
+  );
   const [slug, setSlug] = useState("tobi");
   const [previousSlug] = useState("samsontobi");
   const [template, setTemplate] = useState<"story" | "index">("story");
@@ -73,6 +76,22 @@ export default function SettingsPage() {
                 onChange={(e) => setSiteUrl(e.target.value)}
                 placeholder="https://..."
               />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                &ldquo;Previously&rdquo; Bio Lines
+              </label>
+              <textarea
+                value={bioPreviously}
+                onChange={(e) => setBioPreviously(e.target.value)}
+                rows={3}
+                placeholder="e.g. Co-founded Paystack mobile, earlier at Konga engineering."
+                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-900 shadow-xs placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-950 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100"
+              />
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                Free-text bio lines for Variant B (Index template) Previously section. Each line appears as a career or background note.
+              </p>
             </div>
           </CardContent>
         </Card>
