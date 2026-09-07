@@ -1,3 +1,49 @@
+-- LOCAL-ONLY SEED — never run against production.
+-- supabase/seed.sql is executed only by explicit local commands
+-- (`supabase db reset`, `supabase seed`); `supabase db push` does NOT apply
+-- it, so linked prod/staging databases are unaffected. Keep slugs/UUIDs here
+-- in sync with the app's local demo fallbacks (features/*/server/service.ts).
+-- NOTE: profiles.id references auth.users(id), so matching auth.users rows
+-- are inserted first. `supabase db reset` runs this file; the UUIDs below
+-- are reserved for local/dev only.
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  created_at,
+  updated_at,
+  raw_user_meta_data
+) values
+(
+  '00000000-0000-0000-0000-000000000000',
+  '00000000-0000-0000-0000-000000000001',
+  'authenticated',
+  'authenticated',
+  'tobi@local.dev',
+  'local-dev-not-a-real-hash',
+  now(),
+  now(),
+  now(),
+  '{"user_name":"SamsonTobi"}'
+),
+(
+  '00000000-0000-0000-0000-000000000000',
+  '00000000-0000-0000-0000-000000000002',
+  'authenticated',
+  'authenticated',
+  'siddharth@local.dev',
+  'local-dev-not-a-real-hash',
+  now(),
+  now(),
+  now(),
+  '{"user_name":"siddhartharun"}'
+)
+on conflict (id) do nothing;
+
 -- Seed 2 demo profiles for local/preview development
 insert into public.profiles (
   id,
