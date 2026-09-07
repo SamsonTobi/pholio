@@ -17,6 +17,7 @@ export default function DashboardLayout({
     { label: "Projects", href: "/dashboard/projects" },
     { label: "Showcases", href: "/dashboard/showcases" },
     { label: "Hacker Groups", href: "/dashboard/hacker-groups" },
+    { label: "API Keys", href: "/dashboard/api-keys" },
     { label: "Settings", href: "/dashboard/settings" },
   ];
 
@@ -43,7 +44,9 @@ export default function DashboardLayout({
                   (item.href === "/dashboard/projects" &&
                     pathname.startsWith("/dashboard/projects")) ||
                   (item.href === "/dashboard/hacker-groups" &&
-                    pathname.startsWith("/dashboard/hacker-groups"));
+                    pathname.startsWith("/dashboard/hacker-groups")) ||
+                  (item.href === "/dashboard/api-keys" &&
+                    pathname.startsWith("/dashboard/api-keys"));
                 return (
                   <Link
                     key={item.href}

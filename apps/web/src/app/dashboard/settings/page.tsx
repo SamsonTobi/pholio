@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { APP_URL } from "@/lib/env";
+import { ArrowRight, Key } from "lucide-react";
 
 export default function SettingsPage() {
   const [displayName, setDisplayName] = useState("Tobi Samson");
@@ -176,6 +178,29 @@ export default function SettingsPage() {
                 [Centered Index + Rows]
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Key className="h-4 w-4 text-neutral-700 dark:text-neutral-300" />
+              <CardTitle>Agent API Keys</CardTitle>
+            </div>
+            <CardDescription>
+              Empower AI coding agents (Claude, Cursor, Copilot, Antigravity) to update your showcase automatically via MCP.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Generate and manage API keys for automated showcase updates and project synchronizations.
+            </p>
+            <Link href="/dashboard/api-keys">
+              <Button type="button" variant="outline" size="sm" className="gap-1.5 shrink-0">
+                Manage Agent API Keys
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
