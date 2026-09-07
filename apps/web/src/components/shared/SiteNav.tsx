@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AccountMenu } from "./AccountMenu";
+import { Logo } from "./Logo";
 
 export function SiteNav({
   isLoggedIn,
@@ -20,11 +21,9 @@ export function SiteNav({
         <Link
           href="/"
           className="flex items-center gap-2 font-semibold tracking-tight text-neutral-950 dark:text-neutral-50"
+          aria-label="pholio home"
         >
-          <span className="h-6 w-6 rounded bg-neutral-900 text-white flex items-center justify-center font-mono text-xs font-bold dark:bg-white dark:text-neutral-950">
-            p/
-          </span>
-          <span>pholio</span>
+          <Logo />
         </Link>
 
         <div className="flex items-center gap-3">

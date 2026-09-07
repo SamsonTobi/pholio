@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/shared/NotificationBell";
 import { ArrowUpRight } from "lucide-react";
+import { Logo } from "@/components/shared/Logo";
 
 export function DashboardShell({
   children,
@@ -32,11 +33,9 @@ export function DashboardShell({
             <Link
               href="/"
               className="flex items-center gap-2 font-semibold tracking-tight text-neutral-950 dark:text-neutral-50"
+              aria-label="pholio home"
             >
-              <span className="h-6 w-6 rounded bg-neutral-900 text-white flex items-center justify-center font-mono text-xs font-bold dark:bg-white dark:text-neutral-950">
-                p/
-              </span>
-              <span className="font-semibold tracking-tight">pholio</span>
+              <Logo />
             </Link>
 
             <nav aria-label="Dashboard" className="flex items-center gap-1 sm:gap-2">

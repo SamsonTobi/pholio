@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/shared/Logo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import { useState, Suspense } from "react";
@@ -69,13 +70,8 @@ function LoginInner() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <Link href="/" className="flex items-center gap-2 mb-8 group">
-        <span className="h-7 w-7 rounded-lg bg-neutral-950 text-white flex items-center justify-center font-mono font-bold text-sm dark:bg-white dark:text-neutral-950">
-          p/
-        </span>
-        <span className="font-semibold text-lg tracking-tight text-neutral-950 dark:text-neutral-50">
-          pholio
-        </span>
+      <Link href="/" className="flex items-center gap-2 mb-8 group" aria-label="pholio home">
+        <Logo width={95} height={31} />
       </Link>
 
       <Card className="w-full max-w-sm">

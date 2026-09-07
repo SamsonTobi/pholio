@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AccountMenu } from "@/components/shared/AccountMenu";
 import { getSessionUser } from "@/features/auth/server/service";
+import { Logo } from "@/components/shared/Logo";
 
 export async function MarketingNav() {
   const sessionUser = await getSessionUser().catch(() => null);
@@ -10,11 +11,8 @@ export async function MarketingNav() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/80">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">
-          <span className="h-6 w-6 rounded bg-neutral-900 text-white flex items-center justify-center font-mono text-xs font-bold dark:bg-white dark:text-neutral-950">
-            p/
-          </span>
-          <span>pholio</span>
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-neutral-950 dark:text-neutral-50" aria-label="pholio home">
+          <Logo />
         </Link>
 
         <div className="flex items-center gap-3">
@@ -55,7 +53,7 @@ export function MarketingFooter() {
     <footer className="border-t border-neutral-200 bg-white py-8 text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-neutral-900 dark:text-neutral-100">pholio</span>
+          <Logo width={63} height={21} />
           <span>&copy; {new Date().getFullYear()}</span>
         </div>
         <div className="flex items-center gap-6">

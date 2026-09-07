@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { LogoMark } from "@/components/shared/Logo";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function JoinHackerGroupPage() {
@@ -146,9 +147,7 @@ export default function JoinHackerGroupPage() {
         {/* Top Header Banner */}
         <div className="border-b border-neutral-100 bg-neutral-50/70 px-6 py-4 dark:border-neutral-800 dark:bg-neutral-900/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="h-5 w-5 rounded bg-neutral-900 text-white flex items-center justify-center font-mono text-[10px] font-bold dark:bg-white dark:text-neutral-950">
-              p/
-            </span>
+            <LogoMark size={20} />
             <span className="font-semibold text-xs tracking-tight text-neutral-900 dark:text-neutral-100">
               pholio
             </span>
