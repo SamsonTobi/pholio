@@ -148,31 +148,31 @@ Tracker + API + UI:
 
 Migrations:
 
-- [ ] 6.1 Migration `019_hacker_groups`: `hacker_groups(id uuid primary key default gen_random_uuid(), slug text unique not null, name text not null, visibility text check (visibility in ('public','private')) default 'private', created_by uuid references profiles(id), slug_history text[] default '{}', created_at timestamptz default now())`. Index `slug`.
-- [ ] 6.2 Migration `020_group_members`: `hacker_group_members(group_id uuid references hacker_groups(id) on delete cascade, user_id uuid references profiles(id) on delete cascade, role text check (role in ('owner','member')) default 'member', joined_at timestamptz default now(), primary key (group_id, user_id))`. Index `(user_id)`.
-- [ ] 6.3 Migration `021_group_invites`: `hacker_group_invites(id uuid primary key default gen_random_uuid(), group_id uuid references hacker_groups(id) on delete cascade, token text unique not null, github_username text, created_by uuid, used_at timestamptz, multi_use boolean default true, created_at timestamptz default now())`. Index `(token)`, `(group_id)`.
-- [ ] 6.4 Migration `022_leaderboard_snapshots`: `leaderboard_snapshots(group_id uuid references hacker_groups(id) on delete cascade, day date not null, rankings jsonb not null, primary key (group_id, day))`.
-- [ ] 6.5 Migration `023_notifications`: `notifications(id uuid primary key default gen_random_uuid(), user_id uuid references profiles(id) on delete cascade, type text check (type in ('digest','spike','peer_push','invite')), payload jsonb default '{}', read_at timestamptz, created_at timestamptz default now())`. Index `(user_id, created_at desc)`.
-- [ ] 6.6 Migration `024_hacker_rls`: RLS — public select public groups + their members/snapshots; members select private group rows; owners insert/update invites/members; owner-only notifications select/update; service_role writes snapshots/notifications.
-- [ ] 6.7 Migration `025_group_slug_history_fn`: same history trigger as profiles for `hacker_groups.slug`.
-- [ ] 6.8 Migration `026_leaderboard_cron`: `pg_cron` daily `compute-leaderboard` calling scoring (via Worker cron or `net.http_post` to `/api/cron/leaderboard` with secret — implement route + secret `CRON_SECRET`, document choice).
+- [x] 6.1 Migration `019_hacker_groups`: `hacker_groups(id uuid primary key default gen_random_uuid(), slug text unique not null, name text not null, visibility text check (visibility in ('public','private')) default 'private', created_by uuid references profiles(id), slug_history text[] default '{}', created_at timestamptz default now())`. Index `slug`.
+- [x] 6.2 Migration `020_group_members`: `hacker_group_members(group_id uuid references hacker_groups(id) on delete cascade, user_id uuid references profiles(id) on delete cascade, role text check (role in ('owner','member')) default 'member', joined_at timestamptz default now(), primary key (group_id, user_id))`. Index `(user_id)`.
+- [x] 6.3 Migration `021_group_invites`: `hacker_group_invites(id uuid primary key default gen_random_uuid(), group_id uuid references hacker_groups(id) on delete cascade, token text unique not null, github_username text, created_by uuid, used_at timestamptz, multi_use boolean default true, created_at timestamptz default now())`. Index `(token)`, `(group_id)`.
+- [x] 6.4 Migration `022_leaderboard_snapshots`: `leaderboard_snapshots(group_id uuid references hacker_groups(id) on delete cascade, day date not null, rankings jsonb not null, primary key (group_id, day))`.
+- [x] 6.5 Migration `023_notifications`: `notifications(id uuid primary key default gen_random_uuid(), user_id uuid references profiles(id) on delete cascade, type text check (type in ('digest','spike','peer_push','invite')), payload jsonb default '{}', read_at timestamptz, created_at timestamptz default now())`. Index `(user_id, created_at desc)`.
+- [x] 6.6 Migration `024_hacker_rls`: RLS — public select public groups + their members/snapshots; members select private group rows; owners insert/update invites/members; owner-only notifications select/update; service_role writes snapshots/notifications.
+- [x] 6.7 Migration `025_group_slug_history_fn`: same history trigger as profiles for `hacker_groups.slug`.
+- [x] 6.8 Migration `026_leaderboard_cron`: `pg_cron` daily `compute-leaderboard` calling scoring (via Worker cron or `net.http_post` to `/api/cron/leaderboard` with secret — implement route + secret `CRON_SECRET`, document choice).
 
 Services + UI + email:
 
-- [ ] 6.9 Implement `src/features/leaderboard/server/scoring.ts`: `pushes_7d` from `github_sync_events`, `showcases_7d` from `showcases`, `recency_bonus` 5/2/0, `activity_score = pushes_7d*10 + showcases_7d*15 + recency_bonus`. Export pure fn + thresholds const. Vitest 5 cases + delta calc.
-- [ ] 6.10 Implement `hacker-groups/server/service.ts` (create, rename slug with history, visibility, invite create/revoke, join by token, add by GitHub username, list members with scores, leave/remove).
-- [ ] 6.11 Implement `leaderboard/server/service.ts` (`compute(group_id)` -> snapshot, `get(group_slug)` respects visibility, spike detect `actives_7d +40% vs 48h`).
-- [ ] 6.12 Implement `notifications/server/service.ts` (`list`, `markRead`, `create` service_role only).
-- [ ] 6.13 Implement zod schemas for group/invite/join.
-- [ ] 6.14 Implement `CRUD /api/hacker-groups`, `POST /api/hacker-groups/join` (token exchange -> member row), `GET /api/leaderboard?group_slug`.
-- [ ] 6.15 Implement `POST /api/cron/leaderboard` (verify `CRON_SECRET`, loops groups, writes snapshots, creates spike/peer_push notifications).
-- [ ] 6.16 Implement `app/hacker-groups/[groupSlug]/page.tsx`: header (name, Public/Private badge, count, `Copy invite link` owner-only + GitHub-username add), leaderboard (rank, avatar, name + `@slug`, score, pushes/showcases, `Updated X ago`, you-highlight, delta ▲/▼/–), peer feed (latest showcases + pushes), empty `No members yet — share the invite link.` Private gate: redirect non-members to join page.
-- [ ] 6.17 Implement `app/hacker-groups/join/[token]/page.tsx` (validate token, Join button -> member).
-- [ ] 6.18 Implement dashboard `app/dashboard/hacker-groups/page.tsx` (create, list, member manage).
-- [ ] 6.19 Implement notifications bell + feed (in-app list, read state).
-- [ ] 6.20 Implement Resend templates (`digest`, `spike`, `invite`) with `react-email`, all links via `APP_URL`. Weekly digest cron + instant spike send in leaderboard cron. Add `RESEND_API_KEY` + `CRON_SECRET` to env example.
-- [ ] 6.21 Playwright: 2 users, push changes score/rank, invite link join, digest row created.
-- [ ] Acceptance 6: leaderboard reorders after push, peer feed updates, emails queued.
+- [x] 6.9 Implement `src/features/leaderboard/server/scoring.ts`: `pushes_7d` from `github_sync_events`, `showcases_7d` from `showcases`, `recency_bonus` 5/2/0, `activity_score = pushes_7d*10 + showcases_7d*15 + recency_bonus`. Export pure fn + thresholds const. Vitest 5 cases + delta calc.
+- [x] 6.10 Implement `hacker-groups/server/service.ts` (create, rename slug with history, visibility, invite create/revoke, join by token, add by GitHub username, list members with scores, leave/remove).
+- [x] 6.11 Implement `leaderboard/server/service.ts` (`compute(group_id)` -> snapshot, `get(group_slug)` respects visibility, spike detect `actives_7d +40% vs 48h`).
+- [x] 6.12 Implement `notifications/server/service.ts` (`list`, `markRead`, `create` service_role only).
+- [x] 6.13 Implement zod schemas for group/invite/join.
+- [x] 6.14 Implement `CRUD /api/hacker-groups`, `POST /api/hacker-groups/join` (token exchange -> member row), `GET /api/leaderboard?group_slug`.
+- [x] 6.15 Implement `POST /api/cron/leaderboard` (verify `CRON_SECRET`, loops groups, writes snapshots, creates spike/peer_push notifications).
+- [x] 6.16 Implement `app/hacker-groups/[groupSlug]/page.tsx`: header (name, Public/Private badge, count, `Copy invite link` owner-only + GitHub-username add), leaderboard (rank, avatar, name + `@slug`, score, pushes/showcases, `Updated X ago`, you-highlight, delta ▲/▼/–), peer feed (latest showcases + pushes), empty `No members yet — share the invite link.` Private gate: redirect non-members to join page.
+- [x] 6.17 Implement `app/hacker-groups/join/[token]/page.tsx` (validate token, Join button -> member).
+- [x] 6.18 Implement dashboard `app/dashboard/hacker-groups/page.tsx` (create, list, member manage).
+- [x] 6.19 Implement notifications bell + feed (in-app list, read state).
+- [x] 6.20 Implement Resend templates (`digest`, `spike`, `invite`) with `react-email`, all links via `APP_URL`. Weekly digest cron + instant spike send in leaderboard cron. Add `RESEND_API_KEY` + `CRON_SECRET` to env example.
+- [x] 6.21 Playwright: 2 users, push changes score/rank, invite link join, digest row created.
+- [x] Acceptance 6: leaderboard reorders after push, peer feed updates, emails queued.
 
 ## Phase 7 — Realtime fan-out (pg_net -> Cloudflare Worker DO)
 
