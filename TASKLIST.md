@@ -206,9 +206,9 @@ Frontend:
 - [x] 8.4 Define `packages/shared/mcpSchemas.ts` zod for all 6 tools (see plan §12, body 10..600).
 - [x] 8.5 Implement `/api/mcp` Streamable HTTP via `@modelcontextprotocol/sdk`: Bearer auth, scope check, route to existing services (`projects.update`, `showcases.publish`, `github-sync.reparse`, `mockups.upload(base64)`, `telemetry.getStats`, `leaderboard.get`). Thin wrapper only.
 - [x] 8.6 Implement `app/docs/agent/page.tsx`: dynamic MCP JSON with `NEXT_PUBLIC_APP_URL` + `PHOLIO_BASE_URL`, copy buttons, master prompt block, tool table.
-- [ ] 8.7 Add `packages/mcp-server` thin wrapper (`npx -y @pholio/mcp-server` entry) re-exporting schemas + client pointing at `PHOLIO_BASE_URL`. Document publish later.
+- [x] 8.7 Add `packages/mcp-server` thin wrapper (`npx -y @pholio/mcp-server` entry) re-exporting schemas + client pointing at `PHOLIO_BASE_URL`. Document publish later.
 - [x] 8.8 E2E: with fresh API key, MCP client updates project + publishes showcase + syncs README + fetches stats/leaderboard.
-- [ ] Acceptance 8: Cursor with key completes full loop without dashboard.
+- [x] Acceptance 8: Cursor with key completes full loop without dashboard.
 
 ## Phase 9 — Hardening, tests, deploy
 
