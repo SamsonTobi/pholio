@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description:
     "Connect GitHub once. Pholio builds your showcase, tracks visitors, and stays updated from your pushes — or straight from your coding agent.",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/svgs/pholio_mark.svg",
   },
 };
 
@@ -31,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-screen bg-background text-foreground font-sans antialiased flex flex-col selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-neutral-900">
+      <body className="min-h-screen bg-background text-foreground font-mono antialiased flex flex-col selection:bg-primary selection:text-primary-foreground">
         <Providers>{children}</Providers>
       </body>
     </html>
