@@ -10,28 +10,30 @@ import {
   revokeApiKey,
 } from "@/features/agent-keys/server/service";
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 export async function GET() {
   try {
     const user = await getSessionUser().catch(() => null);
-    const userId = user?.id || DEMO_USER_ID;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
 
     const keys = await listApiKeys(userId);
     return NextResponse.json({ keys });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api] internal error in apps/web/src/app/api/api-keys/route.ts:", message);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getSessionUser().catch(() => null);
-    if (!user && process.env.NODE_ENV === "production") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = user?.id || DEMO_USER_ID;
+    const userId = user.id;
 
     const json = await request.json();
     const parsed = generateApiKeySchema.parse(json);
@@ -52,10 +54,10 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getSessionUser().catch(() => null);
-    if (!user && process.env.NODE_ENV === "production") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = user?.id || DEMO_USER_ID;
+    const userId = user.id;
 
     const json = await request.json();
     const parsed = revokeApiKeySchema.parse(json);
@@ -79,10 +81,10 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const user = await getSessionUser().catch(() => null);
-    if (!user && process.env.NODE_ENV === "production") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = user?.id || DEMO_USER_ID;
+    const userId = user.id;
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

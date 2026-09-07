@@ -24,17 +24,25 @@ export async function GET(request: NextRequest) {
     }
 
     if (ownerId) {
+      const user = await getSessionUser().catch(() => null);
+      // Only allow querying own showcases unless project-scoped; prevent IDOR enumeration
+      if (user && ownerId !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       const showcases = await listShowcasesByOwner(ownerId);
       return NextResponse.json({ showcases });
     }
 
-    return NextResponse.json(
-      { error: "Query parameter project_id or owner_id is required" },
-      { status: 400 }
-    );
+    // Default: current user's showcases (dashboard wiring)
+    const user = await getSessionUser().catch(() => null);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const showcases = await listShowcasesByOwner(user.id);
+    return NextResponse.json({ showcases });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("GET /api/showcases failed", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
@@ -59,6 +67,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ showcase }, { status: 201 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Invalid request";
+    if (message === "Forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (message === "Project not found") {
+      return NextResponse.json({ error: message }, { status: 404 });
+    }
+    if (message === "Service unavailable" || message === "Publish failed") {
+      console.error("POST /api/showcases failed", err);
+      return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    }
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

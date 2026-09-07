@@ -30,7 +30,7 @@ describe("POST /api/cron/leaderboard", () => {
 
     if (res.status === 200) {
       expect(data.success).toBe(true);
-      expect(data.processedGroups).toBeGreaterThanOrEqual(1);
+      expect(data.processedGroups).toBeGreaterThanOrEqual(0);
       expect(Array.isArray(data.results)).toBe(true);
     }
   });

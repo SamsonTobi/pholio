@@ -6,28 +6,30 @@ import {
   createGroup,
 } from "@/features/hacker-groups/server/service";
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 export async function GET() {
   try {
     const user = await getSessionUser().catch(() => null);
-    const userId = user?.id || DEMO_USER_ID;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
 
     const groups = await listGroupsForUser(userId);
     return NextResponse.json({ groups });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api] internal error in apps/web/src/app/api/hacker-groups/route.ts:", message);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getSessionUser().catch(() => null);
-    if (!user && process.env.NODE_ENV === "production") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = user?.id || DEMO_USER_ID;
+    const userId = user.id;
 
     const json = await request.json();
     const parsed = createGroupSchema.parse(json);
@@ -42,6 +44,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ group }, { status: 201 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Invalid request";
+    if (message.includes("already exists")) {
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

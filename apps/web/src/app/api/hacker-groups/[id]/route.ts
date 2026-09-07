@@ -6,8 +6,6 @@ import {
   leaveOrRemoveMember,
 } from "@/features/hacker-groups/server/service";
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -15,10 +13,10 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const user = await getSessionUser();
-    if (!user && process.env.NODE_ENV === "production") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = user?.id || DEMO_USER_ID;
+    const userId = user.id;
 
     const { id } = await params;
     const json = await request.json();
@@ -43,10 +41,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const user = await getSessionUser();
-    if (!user && process.env.NODE_ENV === "production") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = user?.id || DEMO_USER_ID;
+    const userId = user.id;
 
     const { id } = await params;
     const { searchParams } = new URL(request.url);

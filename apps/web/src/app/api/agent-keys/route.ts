@@ -5,42 +5,42 @@ import {
   generateApiKey,
   revokeApiKey,
 } from "@/features/agent-keys/server/service";
-
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
+import { ALLOWED_SCOPES, DEFAULT_SCOPES } from "@/features/agent-keys/server/service";
 
 export async function GET() {
   try {
     const user = await getSessionUser().catch(() => null);
-    const userId =
-      user?.id || (process.env.NODE_ENV !== "production" ? DEMO_USER_ID : null);
-
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = user.id;
 
     const keys = await listApiKeys(userId);
     return NextResponse.json({ keys });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api] internal error in apps/web/src/app/api/agent-keys/route.ts:", message);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getSessionUser().catch(() => null);
-    const userId =
-      user?.id || (process.env.NODE_ENV !== "production" ? DEMO_USER_ID : null);
-
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = user.id;
 
     const json = await request.json();
     const name = typeof json?.name === "string" ? json.name.trim() : null;
-    const scopes = Array.isArray(json?.scopes)
-      ? json.scopes
-      : ["showcase:write"];
+    const rawScopes = Array.isArray(json?.scopes) ? json.scopes : [...DEFAULT_SCOPES];
+    const scopes = rawScopes.filter((s: unknown): s is string =>
+      typeof s === "string" && (ALLOWED_SCOPES as readonly string[]).includes(s)
+    );
+    if (scopes.length === 0) {
+      return NextResponse.json({ error: "No valid scopes provided" }, { status: 400 });
+    }
 
     const generated = await generateApiKey({
       userId,
@@ -64,12 +64,10 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const user = await getSessionUser().catch(() => null);
-    const userId =
-      user?.id || (process.env.NODE_ENV !== "production" ? DEMO_USER_ID : null);
-
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = user.id;
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

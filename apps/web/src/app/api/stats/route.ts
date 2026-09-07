@@ -44,9 +44,9 @@ export async function GET(request: NextRequest) {
       headers: CORS_HEADERS,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal error";
+    console.error("GET /api/stats failed", err);
     return NextResponse.json(
-      { error: message },
+      { error: "Internal error" },
       { status: 500, headers: CORS_HEADERS }
     );
   }

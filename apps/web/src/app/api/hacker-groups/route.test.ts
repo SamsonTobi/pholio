@@ -1,8 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET, POST } from "./route";
 import { NextRequest } from "next/server";
+import { getSessionUser } from "@/features/auth/server/service";
+
+vi.mock("@/features/auth/server/service", () => ({
+  getSessionUser: vi.fn(),
+  requireUser: vi.fn(),
+}));
+
+const mockUser = { id: "test-user-id", email: "test@example.com" };
 
 describe("Hacker groups API route", () => {
+  beforeEach(() => {
+    vi.mocked(getSessionUser).mockResolvedValue(mockUser as any);
+  });
+
+  it("GET /api/hacker-groups returns 401 when unauthenticated", async () => {
+    vi.mocked(getSessionUser).mockResolvedValue(null);
+    const res = await GET();
+    expect(res.status).toBe(401);
+  });
+
   it("GET /api/hacker-groups returns list of user groups", async () => {
     const res = await GET();
     expect(res.status).toBe(200);

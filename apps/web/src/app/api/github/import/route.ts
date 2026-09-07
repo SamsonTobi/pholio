@@ -7,7 +7,10 @@ import { showcaseUrl } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();
-  const userId = user?.id || "00000000-0000-0000-0000-000000000001";
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = user.id;
 
   try {
     const json = await request.json();

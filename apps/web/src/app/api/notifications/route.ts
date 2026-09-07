@@ -6,12 +6,13 @@ import {
   markAllNotificationsAsRead,
 } from "@/features/notifications/server/service";
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 export async function GET() {
   try {
     const user = await getSessionUser();
-    const userId = user?.id || DEMO_USER_ID;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
 
     const notifications = await listNotifications(userId);
     const unreadCount = notifications.filter((n) => !n.read_at).length;
@@ -19,14 +20,18 @@ export async function GET() {
     return NextResponse.json({ notifications, unreadCount });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api] internal error in apps/web/src/app/api/notifications/route.ts:", message);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getSessionUser();
-    const userId = user?.id || DEMO_USER_ID;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
 
     const json = await request.json().catch(() => ({}));
 
@@ -46,6 +51,7 @@ export async function PATCH(request: NextRequest) {
     );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api] internal error in apps/web/src/app/api/notifications/route.ts:", message);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

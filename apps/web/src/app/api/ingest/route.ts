@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { checkRateLimit } from "@/features/telemetry/server/rate-limit";
+import {
+  checkRateLimit,
+  checkSessionRateLimit,
+  getClientIp,
+} from "@/features/telemetry/server/rate-limit";
 import { ingestSchema } from "@/features/telemetry/server/schema";
 import { ingestEvent } from "@/features/telemetry/server/service";
 
@@ -17,9 +21,7 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-  const clientIp = (forwarded ? forwarded.split(",")[0].trim() : realIp) || "127.0.0.1";
+  const clientIp = getClientIp(request);
 
   const rate = checkRateLimit(clientIp);
   if (!rate.allowed) {
@@ -53,16 +55,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const success = await ingestEvent({
-    telemetrySlug: parsed.data.telemetry_slug,
-    sessionHash: parsed.data.session_hash,
-    path: parsed.data.path,
-  });
-
-  if (!success) {
+  const sessionRate = checkSessionRateLimit(parsed.data.session_hash);
+  if (!sessionRate.allowed) {
     return NextResponse.json(
-      { error: "Invalid payload" },
-      { status: 400, headers: CORS_HEADERS }
+      { error: "Rate limit exceeded" },
+      {
+        status: 429,
+        headers: {
+          ...CORS_HEADERS,
+          "Retry-After": String(sessionRate.retryAfter ?? 60),
+        },
+      }
+    );
+  }
+
+  try {
+    const success = await ingestEvent({
+      telemetrySlug: parsed.data.telemetry_slug,
+      sessionHash: parsed.data.session_hash,
+      path: parsed.data.path,
+    });
+
+    if (!success) {
+      return NextResponse.json(
+        { error: "Invalid payload" },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+  } catch (err) {
+    console.error("ingest failed", err);
+    return NextResponse.json(
+      { error: "Service unavailable" },
+      { status: 503, headers: CORS_HEADERS }
     );
   }
 

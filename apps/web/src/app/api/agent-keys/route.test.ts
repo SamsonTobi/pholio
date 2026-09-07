@@ -1,11 +1,21 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GET, POST, DELETE } from "./route";
 import { NextRequest } from "next/server";
 import { resetInMemoryApiKeys } from "@/features/agent-keys/server/service";
+import { getSessionUser } from "@/features/auth/server/service";
+
+vi.mock("@/features/auth/server/service", () => ({
+  getSessionUser: vi.fn(),
+  requireUser: vi.fn(),
+  getProviderToken: vi.fn().mockResolvedValue(null),
+}));
+
+const mockUser = { id: "test-user-id", email: "test@example.com" };
 
 describe("Agent Keys API Route (/api/agent-keys)", () => {
   beforeEach(() => {
     resetInMemoryApiKeys();
+    vi.mocked(getSessionUser).mockResolvedValue(mockUser as any);
   });
 
   it("POST /api/agent-keys generates a key with plaintext token", async () => {

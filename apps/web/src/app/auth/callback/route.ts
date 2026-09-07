@@ -2,10 +2,19 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { APP_URL } from "@/lib/env";
 
+function getSafeNext(raw: string | null): string {
+  if (!raw) return "/dashboard";
+  // Only allow relative paths starting with single / and containing no : or //
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes(":") || raw.includes("\\")) {
+    return "/dashboard";
+  }
+  return raw;
+}
+
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") || "/dashboard";
+  const next = getSafeNext(requestUrl.searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser } from "@/features/auth/server/service";
 import {
+  MAX_MOCKUP_BASE64_LENGTH,
   mockupDeviceSchema,
   reorderMockupsSchema,
 } from "@/features/mockups/server/schema";
@@ -26,8 +27,8 @@ export async function GET(request: NextRequest) {
     const mockups = await listMockupsByProject(projectId);
     return NextResponse.json({ mockups });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("GET /api/mockups failed", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
@@ -81,6 +82,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: "No file data provided in request body" },
           { status: 400 }
+        );
+      }
+
+      if (typeof base64Data === "string" && base64Data.length > MAX_MOCKUP_BASE64_LENGTH) {
+        return NextResponse.json(
+          { error: "File data exceeds size limit" },
+          { status: 413 }
         );
       }
 

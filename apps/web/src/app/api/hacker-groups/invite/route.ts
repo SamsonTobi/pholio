@@ -3,12 +3,13 @@ import { getSessionUser } from "@/features/auth/server/service";
 import { createInviteSchema } from "@/features/hacker-groups/server/schema";
 import { createGroupInvite } from "@/features/hacker-groups/server/service";
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 export async function POST(request: NextRequest) {
   try {
     const user = await getSessionUser();
-    const userId = user?.id || DEMO_USER_ID;
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
 
     const json = await request.json();
     const parsed = createInviteSchema.safeParse(json);
