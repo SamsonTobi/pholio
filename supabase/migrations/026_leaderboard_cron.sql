@@ -1,0 +1,16 @@
+-- Placeholder for daily leaderboard compute cron
+-- Calls POST /api/cron/leaderboard with Authorization Bearer CRON_SECRET
+-- In production with pg_cron and pg_net enabled on Supabase:
+-- select cron.schedule(
+--   'compute-leaderboard-daily',
+--   '0 2 * * *',
+--   $$
+--   select net.http_post(
+--     url := current_setting('app.settings.app_url', true) || '/api/cron/leaderboard',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'Authorization', 'Bearer ' || current_setting('app.settings.cron_secret', true)
+--     )
+--   );
+--   $$
+-- );
