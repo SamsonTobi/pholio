@@ -4,7 +4,12 @@ import { renderToString } from "react-dom/server";
 import ApiKeysPage from "@/app/dashboard/api-keys/page";
 import AgentDocsPage from "@/app/docs/agent/page";
 
-// Mock next/navigation
+// Async MarketingNav (session-aware) suspends under legacy renderToString;
+// stub the chrome, this suite asserts page body content only.
+vi.mock("@/components/marketing-nav", () => ({
+  MarketingNav: () => null,
+  MarketingFooter: () => null,
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn(),

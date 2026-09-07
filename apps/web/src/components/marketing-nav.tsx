@@ -1,8 +1,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { AccountMenu } from "@/components/shared/AccountMenu";
+import { getSessionUser } from "@/features/auth/server/service";
 
-export function MarketingNav() {
+export async function MarketingNav() {
+  const sessionUser = await getSessionUser().catch(() => null);
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/80">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
@@ -14,16 +18,32 @@ export function MarketingNav() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <Link href="/login">
-            <Button variant="ghost" size="sm">
-              Login
-            </Button>
-          </Link>
-          <Link href="/login">
-            <Button size="sm">
-              Join Pholio
-            </Button>
-          </Link>
+          {sessionUser ? (
+            <>
+              <Link href="/dashboard/projects">
+                <Button size="sm">Go to Dashboard</Button>
+              </Link>
+              <AccountMenu
+                email={sessionUser.email ?? null}
+                avatarUrl={
+                  (sessionUser.user_metadata?.avatar_url as string | undefined) ?? null
+                }
+              />
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button variant="ghost" size="sm">
+                  Login
+                </Button>
+              </Link>
+              <Link href="/login">
+                <Button size="sm">
+                  Join Pholio
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>
