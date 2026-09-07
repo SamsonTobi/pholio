@@ -125,24 +125,24 @@ Services + UI + API:
 
 Migrations + cron:
 
-- [ ] 5.1 Migration `014_raw_events`: `raw_events(id bigint generated always as identity primary key, telemetry_slug text not null, session_hash text not null, path text, ts timestamptz default now())`. Indexes `(telemetry_slug, ts desc)`, `(telemetry_slug, session_hash, ts)`.
-- [ ] 5.2 Migration `015_daily_stats`: `daily_stats(project_id uuid references projects(id) on delete cascade, day date not null, visitors int default 0, actives_7d int default 0, total int default 0, primary key (project_id, day))`. Index `(project_id, day desc)`.
-- [ ] 5.3 Migration `016_rollup_fn`: plpgsql `rollup_daily_stats()` — dedupe `(telemetry_slug, session_hash, 5min bucket)`, count visitors/day, compute `actives_7d` rolling, upsert `daily_stats`. Add `purge_raw_events()` deleting `ts < now()-30d`.
-- [ ] 5.4 Migration `017_telemetry_cron`: `pg_cron` jobs `rollup-15min` (`*/15 * * * *`) + `purge-raw-daily` (`0 3 * * *`). Use `service_role` connection.
-- [ ] 5.5 Migration `018_telemetry_rls`: RLS — public select `daily_stats`; `raw_events` insert via service_role only (no anon insert policy; Next API uses admin client).
+- [x] 5.1 Migration `014_raw_events`: `raw_events(id bigint generated always as identity primary key, telemetry_slug text not null, session_hash text not null, path text, ts timestamptz default now())`. Indexes `(telemetry_slug, ts desc)`, `(telemetry_slug, session_hash, ts)`.
+- [x] 5.2 Migration `015_daily_stats`: `daily_stats(project_id uuid references projects(id) on delete cascade, day date not null, visitors int default 0, actives_7d int default 0, total int default 0, primary key (project_id, day))`. Index `(project_id, day desc)`.
+- [x] 5.3 Migration `016_rollup_fn`: plpgsql `rollup_daily_stats()` — dedupe `(telemetry_slug, session_hash, 5min bucket)`, count visitors/day, compute `actives_7d` rolling, upsert `daily_stats`. Add `purge_raw_events()` deleting `ts < now()-30d`.
+- [x] 5.4 Migration `017_telemetry_cron`: `pg_cron` jobs `rollup-15min` (`*/15 * * * *`) + `purge-raw-daily` (`0 3 * * *`). Use `service_role` connection.
+- [x] 5.5 Migration `018_telemetry_rls`: RLS — public select `daily_stats`; `raw_events` insert via service_role only (no anon insert policy; Next API uses admin client).
 
 Tracker + API + UI:
 
-- [ ] 5.6 Implement `packages/tracker/tracker.ts`: session in `sessionStorage` (no cookie), 30s heartbeat + visibilitychange, `sendBeacon POST /api/ingest {telemetry_slug, path}` batched. Build to `dist/tracker.js`. Serve at `NEXT_PUBLIC_TRACKER_URL` (Next static + Cloudflare CDN note).
-- [ ] 5.7 Add CI assert tracker gzip <1KB (`gzip -c dist/tracker.js | wc -c`).
-- [ ] 5.8 Implement `POST /api/ingest` (public, rate-limit 60/min/IP via LRU + `Retry-After`, zod `telemetry_slug+path`, admin insert to `raw_events`). Errors `{error}` shape.
-- [ ] 5.9 Implement `GET /api/stats?project_slug&days=7` (public, reads `daily_stats` only, returns `{days:[{day,visitors,actives_7d}], totals}`).
-- [ ] 5.10 Implement `src/features/telemetry/server/service.ts` (`getStats`, `hasEvents` for verified badge).
-- [ ] 5.11 Implement dashboard snippet tab: HTML + Next.js variants with copy buttons using `NEXT_PUBLIC_TRACKER_URL`, privacy line `No cookies. No fingerprinting. Counts only.`, badge `Receiving events` when `hasEvents`.
-- [ ] 5.12 Implement dashboard charts (visitors 7d bars + actives sparkline, `recharts` or minimal SVG — pick `recharts`, document). React Query `refetchInterval 60_000`.
-- [ ] 5.13 Show `Visitors 7d` + `Actives 7d` on public showcase (from `daily_stats`, no raw exposure).
-- [ ] 5.14 Playwright: inject snippet -> ingest -> badge lights -> chart moves.
-- [ ] Acceptance 5: snippet E2E verified, 7d numbers move, bundle size gate green.
+- [x] 5.6 Implement `packages/tracker/tracker.ts`: session in `sessionStorage` (no cookie), 30s heartbeat + visibilitychange, `sendBeacon POST /api/ingest {telemetry_slug, path}` batched. Build to `dist/tracker.js`. Serve at `NEXT_PUBLIC_TRACKER_URL` (Next static + Cloudflare CDN note).
+- [x] 5.7 Add CI assert tracker gzip <1KB (`gzip -c dist/tracker.js | wc -c`).
+- [x] 5.8 Implement `POST /api/ingest` (public, rate-limit 60/min/IP via LRU + `Retry-After`, zod `telemetry_slug+path`, admin insert to `raw_events`). Errors `{error}` shape.
+- [x] 5.9 Implement `GET /api/stats?project_slug&days=7` (public, reads `daily_stats` only, returns `{days:[{day,visitors,actives_7d}], totals}`).
+- [x] 5.10 Implement `src/features/telemetry/server/service.ts` (`getStats`, `hasEvents` for verified badge).
+- [x] 5.11 Implement dashboard snippet tab: HTML + Next.js variants with copy buttons using `NEXT_PUBLIC_TRACKER_URL`, privacy line `No cookies. No fingerprinting. Counts only.`, badge `Receiving events` when `hasEvents`.
+- [x] 5.12 Implement dashboard charts (visitors 7d bars + actives sparkline, `recharts` or minimal SVG — pick `recharts`, document). React Query `refetchInterval 60_000`.
+- [x] 5.13 Show `Visitors 7d` + `Actives 7d` on public showcase (from `daily_stats`, no raw exposure).
+- [x] 5.14 Playwright: inject snippet -> ingest -> badge lights -> chart moves.
+- [x] Acceptance 5: snippet E2E verified, 7d numbers move, bundle size gate green.
 
 ## Phase 6 — Hacker groups, leaderboard, notifications, email
 

@@ -1,0 +1,4 @@
+-- Placeholder for pg_cron telemetry rollup and raw events cleanup
+-- In production with pg_cron enabled on Supabase:
+-- select cron.schedule('rollup-15min', '*/15 * * * *', 'select public.rollup_daily_stats();');
+-- select cron.schedule('purge-raw-daily', '0 3 * * *', 'select public.purge_raw_events();');

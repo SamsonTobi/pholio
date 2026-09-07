@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "bun build tracker.ts --minify --outfile dist/tracker.js",
+    "size-check": "bun run build && [ $(gzip -c dist/tracker.js | wc -c) -lt 1024 ] && echo 'Tracker size < 1KB OK'",
     "check": "tsc --noEmit"
   },
   "devDependencies": {
