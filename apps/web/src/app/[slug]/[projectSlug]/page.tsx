@@ -2,7 +2,9 @@ import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { getBySlug } from "@/features/profile/server/service";
 import { getProjectBySlug } from "@/features/projects/server/service";
+import { getSessionUser } from "@/features/auth/server/service";
 import { StoryProjectSection } from "@/components/shared/StoryProjectSection";
+import { SiteNav } from "@/components/shared/SiteNav";
 import { APP_URL, projectDeepUrl } from "@/lib/env";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
@@ -64,8 +66,18 @@ export default async function ProjectDeepPage({
   const project = await getProjectBySlug(profile.id, projectSlug);
   if (!project) notFound();
 
+  const sessionUser = await getSessionUser().catch(() => null);
+  const isOwner = Boolean(sessionUser && sessionUser.id === profile.id);
+
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6">
+    <div className="min-h-screen">
+      <SiteNav
+        isLoggedIn={Boolean(sessionUser)}
+        email={sessionUser?.email ?? null}
+        avatarUrl={(sessionUser?.user_metadata?.avatar_url as string | undefined) ?? null}
+        showcaseHref={isOwner ? `/${profile.slug}` : null}
+      />
+      <div className="py-10 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto space-y-8">
         <Link
           href={`/${profile.slug}`}
@@ -110,7 +122,8 @@ export default async function ProjectDeepPage({
               ))}
             </div>
           </div>
-        )}
+          )}
+      </div>
       </div>
     </div>
   );
