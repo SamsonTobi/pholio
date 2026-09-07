@@ -212,16 +212,16 @@ Frontend:
 
 ## Phase 9 — Hardening, tests, deploy
 
-- [ ] 9.1 RLS matrix tests (vitest + Supabase): anon cannot write, owner can, private group blocked, public readable, service_role paths only via admin.
-- [ ] 9.2 Rate-limit tests for `/api/ingest` (60/min/IP -> 429 + `Retry-After`).
-- [ ] 9.3 Tracker size + privacy asserts (gzip <1KB, no cookie/document.cookie usage).
-- [ ] 9.4 Playwright flows: join->import->showcase live; template toggle; snippet verified; hacker group invite join + leaderboard; MCP publish (mock client).
-- [ ] 9.5 A11y pass (axe on `/`, `[slug]`, group page), keyboard nav for rail/tabs, alt text for icons/mockups.
-- [ ] 9.6 Perf: RSC where possible, `next/image` for avatars/mockups/icons, OG cached, charts lazy.
-- [ ] 9.7 Banned-term + env-hardcode grep CI (no `localhost`, no `pholio.dev`, no direct domains outside `env.ts` + docs placeholder).
-- [ ] 9.8 Deploy checklist: Vercel envs from `.env.example` with prod `APP_URL`; Supabase Auth redirect allowlist prod URL, webhook URL `${APP_URL}/api/webhooks/github`; Storage CORS; `pg_cron`/`pg_net` enabled; Cloudflare `wrangler deploy` + secrets; Resend domain verified.
-- [ ] 9.9 Senior review per `AGENTS.md` (correctness, bugs, arch, quality, integration, security, perf, errors, consistency). Fix Critical/Important before close.
-- [ ] Acceptance 9: all checks green on prod URL derived purely from env.
+- [x] 9.1 RLS matrix tests (vitest + Supabase): anon cannot write, owner can, private group blocked, public readable, service_role paths only via admin.
+- [x] 9.2 Rate-limit tests for `/api/ingest` (60/min/IP -> 429 + `Retry-After`).
+- [x] 9.3 Tracker size + privacy asserts (gzip <1KB, no cookie/document.cookie usage).
+- [x] 9.4 Playwright flows: join->import->showcase live; template toggle; snippet verified; hacker group invite join + leaderboard; MCP publish (mock client).
+- [x] 9.5 A11y pass (axe on `/`, `[slug]`, group page), keyboard nav for rail/tabs, alt text for icons/mockups.
+- [x] 9.6 Perf: RSC where possible, `next/image` for avatars/mockups/icons, OG cached, charts lazy.
+- [x] 9.7 Banned-term + env-hardcode grep CI (no `localhost`, no `pholio.dev`, no direct domains outside `env.ts` + docs placeholder).
+- [x] 9.8 Deploy checklist: Vercel envs from `.env.example` with prod `APP_URL`; Supabase Auth redirect allowlist prod URL, webhook URL `${APP_URL}/api/webhooks/github`; Storage CORS; `pg_cron`/`pg_net` enabled; Cloudflare `wrangler deploy` + secrets; Resend domain verified.
+- [x] 9.9 Senior review per `AGENTS.md` (correctness, bugs, arch, quality, integration, security, perf, errors, consistency). Fix Critical/Important before close.
+- [x] Acceptance 9: all checks green on prod URL derived purely from env.
 
 ---
 
