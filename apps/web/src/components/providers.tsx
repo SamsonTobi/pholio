@@ -11,7 +11,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000,
-            refetchInterval: 60 * 1000,
+            // NOTE: no global refetchInterval. Realtime updates arrive via
+            // useRealtimeChannel + targeted invalidateQueries; per-chart
+            // polling (e.g. TelemetryChart refetchInterval: 60_000) is the
+            // only periodic fallback.
           },
         },
       })

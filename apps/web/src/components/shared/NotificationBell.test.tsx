@@ -17,9 +17,10 @@ describe("NotificationBell Component", () => {
     expect(html).toContain("lucide-bell");
   });
 
-  it("renders unread badge when unread notifications exist", () => {
+  it("starts empty with no fake unread badge", () => {
     const html = renderToString(<NotificationBell />);
-    // Initial state contains unread items (spike, peer_push, digest)
-    expect(html).toContain("rounded-full");
+    // Honest initial state: [] notifications, no fabricated unread badge
+    expect(html).not.toContain("unread");
+    expect(html).not.toContain("Lagos Hackers");
   });
 });

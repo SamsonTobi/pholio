@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 function GithubIcon({ className }: { className?: string }) {
   return (
@@ -18,21 +19,50 @@ function GithubIcon({ className }: { className?: string }) {
   );
 }
 
+function getSafeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes(":") || raw.includes("\\")) {
+    return null;
+  }
+  return raw;
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
+  );
+}
+
+function LoginInner() {
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const authFailed = searchParams.get("error") === "auth-failed";
 
   const handleGitHubLogin = async () => {
     setLoading(true);
+    setLoginError(null);
     try {
       const supabase = createClient();
-      await supabase.auth.signInWithOAuth({
+      const params = new URLSearchParams(window.location.search);
+      const next = getSafeNext(params.get("next"));
+      const redirectTo = next
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+        : `${window.location.origin}/auth/callback`;
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo,
           scopes: "read:user repo",
         },
       });
+      if (error) {
+        throw error;
+      }
     } catch {
+      setLoginError("GitHub sign-in failed. Please try again.");
       setLoading(false);
     }
   };
@@ -56,6 +86,14 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {(authFailed || loginError) && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+            >
+              {loginError || "Sign-in failed. Please try connecting with GitHub again."}
+            </div>
+          )}
           <Button
             className="w-full gap-2"
             size="lg"
@@ -65,6 +103,10 @@ export default function LoginPage() {
             <GithubIcon className="h-4 w-4" />
             {loading ? "Connecting..." : "Continue with GitHub"}
           </Button>
+          <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+            Pholio requests <code className="font-mono">read:user</code> and{" "}
+            <code className="font-mono">repo</code> access to import your repositories and keep showcases in sync.
+          </p>
 
           <div className="text-center text-xs text-neutral-500">
             First time here?{" "}

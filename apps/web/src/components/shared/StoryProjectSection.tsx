@@ -1,4 +1,6 @@
 import * as React from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { StatusPill } from "./StatusPill";
 import { DeviceFrame } from "./DeviceFrame";
 import { ExternalLink, Star } from "lucide-react";
@@ -15,12 +17,14 @@ export interface StoryProjectProps {
   icon_url?: string | null;
   live_url?: string | null;
   stars?: number;
+  status?: string | null;
   last_push_at?: string | null;
   mockupUrl?: string | null;
   mockupDevice?: "browser" | "phone" | "tablet";
   showcaseBodies?: string[];
   visitors7d?: number;
   actives7d?: number;
+  href?: string | null;
 }
 
 export function StoryProjectSection({
@@ -32,14 +36,23 @@ export function StoryProjectSection({
   icon_url,
   live_url,
   stars,
+  status,
   last_push_at,
   mockupUrl,
   mockupDevice = "browser",
   showcaseBodies = [],
   visitors7d,
   actives7d,
+  href,
 }: StoryProjectProps) {
-  const displayTagline = tagline || description || "A product built for creators and engineers";
+  const displayTagline = tagline || description || null;
+  const titleNode = href ? (
+    <Link href={href} className="hover:underline underline-offset-4">
+      {name}
+    </Link>
+  ) : (
+    <span>{name}</span>
+  );
 
   return (
     <section id={`project-${showcase_slug}`} className="space-y-6 pt-6 first:pt-0 scroll-mt-24">
@@ -47,12 +60,27 @@ export function StoryProjectSection({
         {/* Title row */}
         <div className="flex items-center gap-3">
           {icon_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={icon_url}
-              alt={name}
-              className="h-7 w-7 rounded-lg object-cover border border-neutral-200 dark:border-neutral-800"
-            />
+            icon_url.startsWith("data:") || icon_url.startsWith("blob:") ? (
+              <img
+                src={icon_url}
+                alt={`${name} icon`}
+                loading="lazy"
+                decoding="async"
+                width={28}
+                height={28}
+                className="h-7 w-7 rounded-lg object-cover border border-neutral-200 dark:border-neutral-800"
+              />
+            ) : (
+              <Image
+                src={icon_url}
+                alt={`${name} icon`}
+                width={28}
+                height={28}
+                loading="lazy"
+                sizes="28px"
+                className="h-7 w-7 rounded-lg object-cover border border-neutral-200 dark:border-neutral-800"
+              />
+            )
           ) : (
             <div className="h-7 w-7 rounded-lg bg-neutral-200 flex items-center justify-center font-bold text-xs text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200">
               {name.substring(0, 1)}
@@ -60,11 +88,15 @@ export function StoryProjectSection({
           )}
 
           <h2 className="text-xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50 flex items-center gap-2">
-            <span>{name}</span>
-            <span className="text-neutral-400 font-normal">—</span>
-            <span className="text-neutral-500 font-normal text-base dark:text-neutral-400">
-              {displayTagline}
-            </span>
+            {titleNode}
+            {displayTagline && (
+              <>
+                <span className="text-neutral-400 font-normal">—</span>
+                <span className="text-neutral-500 font-normal text-base dark:text-neutral-400">
+                  {displayTagline}
+                </span>
+              </>
+            )}
           </h2>
 
           {live_url && (
@@ -82,7 +114,7 @@ export function StoryProjectSection({
 
         {/* Status pill & metadata row */}
         <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-500">
-          <StatusPill status="Shipped" />
+          <StatusPill status={status || "Shipped"} />
           <StatPulse
             projectSlug={showcase_slug}
             visitors7d={visitors7d}
@@ -121,13 +153,7 @@ export function StoryProjectSection({
           src={mockupUrl}
           alt={`${name} Showcase Preview`}
         />
-      ) : (
-        <DeviceFrame
-          device={mockupDevice}
-          src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80"
-          alt={`${name} Default Preview`}
-        />
-      )}
+      ) : null}
     </section>
   );
 }

@@ -37,30 +37,10 @@ export interface HackerGroupItem {
   created_at: string;
 }
 
-const INITIAL_GROUPS: HackerGroupItem[] = [
-  {
-    id: "g1",
-    name: "Lagos Hackers",
-    slug: "lagos-hackers",
-    visibility: "public",
-    member_count: 4,
-    user_role: "owner",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
-  },
-  {
-    id: "g2",
-    name: "YC W26 Builders",
-    slug: "yc-w26",
-    visibility: "private",
-    member_count: 2,
-    user_role: "owner",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-  },
-];
-
 export default function HackerGroupsDashboardPage() {
-  const [groups, setGroups] = React.useState<HackerGroupItem[]>(INITIAL_GROUPS);
-  const [loading, setLoading] = React.useState(false);
+  const [groups, setGroups] = React.useState<HackerGroupItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
 
   // Create Dialog state
@@ -77,16 +57,26 @@ export default function HackerGroupsDashboardPage() {
     let ignore = false;
     async function fetchGroups() {
       setLoading(true);
+      setLoadError(null);
       try {
         const res = await fetch("/api/hacker-groups");
-        if (res.ok) {
-          const data = await res.json();
-          if (!ignore && data.groups && Array.isArray(data.groups)) {
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || "Failed to load hacker groups.");
+        }
+        const data = await res.json();
+        if (!ignore) {
+          if (data.groups && Array.isArray(data.groups)) {
             setGroups(data.groups);
+          } else {
+            setGroups([]);
           }
         }
-      } catch {
-        // Use fallback initial groups
+      } catch (err) {
+        if (!ignore) {
+          setGroups([]);
+          setLoadError(err instanceof Error ? err.message : "Failed to load hacker groups.");
+        }
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -182,6 +172,15 @@ export default function HackerGroupsDashboardPage() {
           Create Hacker Group
         </Button>
       </div>
+
+      {loadError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+        >
+          {loadError}
+        </div>
+      )}
 
       {/* Filter / Search Bar (if groups exist) */}
       {groups.length > 0 && (
@@ -333,17 +332,18 @@ export default function HackerGroupsDashboardPage() {
 
           <form onSubmit={handleCreateGroup} className="space-y-4 py-2">
             {createError && (
-              <div className="rounded-lg bg-neutral-100 p-3 text-xs font-medium text-neutral-900 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:border-neutral-800">
+              <div role="alert" className="rounded-lg bg-neutral-100 p-3 text-xs font-medium text-neutral-900 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:border-neutral-800">
                 {createError}
               </div>
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor="group-name" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 Group Name
               </label>
               <Input
-                placeholder="e.g. Lagos Hackers"
+                id="group-name"
+                placeholder="e.g. design-eng"
                 value={name}
                 onChange={handleNameChange}
                 required
@@ -352,7 +352,7 @@ export default function HackerGroupsDashboardPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor="group-slug" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 Group Slug
               </label>
               <div className="flex items-center gap-1.5">
@@ -360,7 +360,8 @@ export default function HackerGroupsDashboardPage() {
                   /hacker-groups/
                 </span>
                 <Input
-                  placeholder="lagos-hackers"
+                  id="group-slug"
+                  placeholder="e.g. design-eng"
                   value={slug}
                   onChange={(e) => {
                     setSlug(e.target.value);
@@ -373,13 +374,14 @@ export default function HackerGroupsDashboardPage() {
             </div>
 
             <div className="space-y-2 pt-1">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <span id="visibility-label" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 Visibility
-              </label>
-              <div className="grid grid-cols-2 gap-2">
+              </span>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="visibility-label">
                 <button
                   type="button"
                   onClick={() => setVisibility("public")}
+                  aria-pressed={visibility === "public"}
                   className={`flex flex-col items-start p-3 rounded-lg border text-left transition-colors ${
                     visibility === "public"
                       ? "border-neutral-900 bg-neutral-50 dark:border-neutral-100 dark:bg-neutral-900"
@@ -398,6 +400,7 @@ export default function HackerGroupsDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setVisibility("private")}
+                  aria-pressed={visibility === "private"}
                   className={`flex flex-col items-start p-3 rounded-lg border text-left transition-colors ${
                     visibility === "private"
                       ? "border-neutral-900 bg-neutral-50 dark:border-neutral-100 dark:bg-neutral-900"

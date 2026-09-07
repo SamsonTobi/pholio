@@ -1,6 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
-import { projectDeepUrl } from "@/lib/env";
+import Image from "next/image";
 import { StatPulse } from "./StatPulse";
 
 export interface IndexProjectRowProps {
@@ -57,20 +57,41 @@ export function IndexProjectRow({
 
       {thumbnails.length > 0 && (
         <div className="flex items-center gap-2 pt-1">
-          {thumbnails.slice(0, 3).map((thumb, i) => (
-            <Link
-              key={i}
-              href={href}
-              className="h-16 w-24 rounded-lg overflow-hidden border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 hover:opacity-90 transition-opacity"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb}
-                alt={`${name} thumbnail`}
-                className="h-full w-full object-cover"
-              />
-            </Link>
-          ))}
+          {thumbnails.slice(0, 3).map((thumb, i) =>
+            thumb.startsWith("data:") || thumb.startsWith("blob:") ? (
+              <Link
+                key={i}
+                href={href}
+                aria-label={`View ${name} showcase`}
+                className="h-16 w-24 rounded-lg overflow-hidden border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 hover:opacity-90 transition-opacity"
+              >
+                <img
+                  src={thumb}
+                  alt={`${name} thumbnail ${i + 1}`}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              </Link>
+            ) : (
+              <Link
+                key={i}
+                href={href}
+                aria-label={`View ${name} showcase`}
+                className="h-16 w-24 rounded-lg overflow-hidden border border-neutral-200 bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 hover:opacity-90 transition-opacity relative block"
+              >
+                <Image
+                  src={thumb}
+                  alt={`${name} thumbnail ${i + 1}`}
+                  width={96}
+                  height={64}
+                  loading="lazy"
+                  sizes="96px"
+                  className="h-full w-full object-cover"
+                />
+              </Link>
+            )
+          )}
         </div>
       )}
     </div>

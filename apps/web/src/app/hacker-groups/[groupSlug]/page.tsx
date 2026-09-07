@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
+import { useParams } from "next/navigation";
 import {
   Users,
   Copy,
@@ -14,16 +15,15 @@ import {
   Sparkles,
   ArrowLeft,
   Share2,
-  TrendingUp,
-  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TimeAgo } from "@/components/shared/TimeAgo";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { Avatar } from "@/components/ui/avatar";
 import { useRealtimeChannel } from "@/lib/realtime-client";
 import { cn } from "@/lib/utils";
 import {
@@ -76,12 +76,11 @@ interface PeerActivityItem {
   timestamp: string;
 }
 
-const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 export default function HackerGroupDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const groupSlug = params?.groupSlug as string;
+
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -93,6 +92,7 @@ export default function HackerGroupDetailPage() {
   // Copy state
   const [copied, setCopied] = React.useState(false);
   const [inviteToken, setInviteToken] = React.useState<string | null>(null);
+  const [inviteError, setInviteError] = React.useState<string | null>(null);
 
   // Invite by GitHub dialog
   const [isInviteOpen, setIsInviteOpen] = React.useState(false);
@@ -100,52 +100,86 @@ export default function HackerGroupDetailPage() {
   const [inviting, setInviting] = React.useState(false);
   const [inviteSuccess, setInviteSuccess] = React.useState(false);
 
-  // Request Access state for gated groups
-  const [accessRequested, setAccessRequested] = React.useState(false);
-
-  const fetchGroupData = React.useCallback(async () => {
-    if (!groupSlug) return;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch(`/api/leaderboard?group_slug=${encodeURIComponent(groupSlug)}`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Hacker group not found");
+  const fetchGroupData = React.useCallback(
+    async (opts?: { background?: boolean }) => {
+      if (!groupSlug) return;
+      const background = Boolean(opts?.background);
+      if (!background) {
+        setLoading(true);
+      }
+      if (!background) {
+        setError(null);
       }
 
-      if (data.isGate) {
-        setIsGate(true);
-        setGroup(data.group);
-      } else {
-        setIsGate(false);
-        setGroup(data.group);
-        setLeaderboard(data.leaderboard || []);
-        setPeerFeed(data.peerFeed || []);
+      try {
+        const res = await fetch(`/api/leaderboard?group_slug=${encodeURIComponent(groupSlug)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Hacker group not found");
+        }
+
+        if (data.isGate) {
+          setIsGate(true);
+          setGroup(data.group);
+        } else {
+          setIsGate(false);
+          setGroup(data.group);
+          setLeaderboard(data.leaderboard || []);
+          setPeerFeed(data.peerFeed || []);
+        }
+        if (!background) {
+          setError(null);
+        }
+      } catch (err: unknown) {
+        // Background polls must never wipe loaded data with an error screen.
+        if (!background) {
+          setError(err instanceof Error ? err.message : "Failed to load hacker group");
+        }
+      } finally {
+        if (!background) {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load hacker group");
-    } finally {
-      setLoading(false);
-    }
-  }, [groupSlug]);
+    },
+    [groupSlug]
+  );
 
   React.useEffect(() => {
     fetchGroupData();
-    // Period-based fallback polling (refetchInterval: 60_000)
-    const interval = setInterval(fetchGroupData, 60000);
+    // Period-based fallback polling (refetchInterval: 60_000) — background refetch, keep data
+    const interval = setInterval(() => fetchGroupData({ background: true }), 60000);
     return () => clearInterval(interval);
-  }, [fetchGroupData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupSlug]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function loadSessionUser() {
+      try {
+        const res = await fetch("/api/profile");
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setCurrentUserId(data.profile?.id || null);
+        }
+      } catch {
+        // leave as null (no highlight)
+      }
+    }
+    loadSessionUser();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Live realtime updates via Cloudflare Worker Durable Object channel
   useRealtimeChannel(group?.id ? `hacker-group:${group.id}` : null, () => {
-    fetchGroupData();
+    fetchGroupData({ background: true });
   });
 
   const handleCopyInvite = async () => {
     if (!group) return;
+    setInviteError(null);
 
     try {
       let token = inviteToken;
@@ -155,21 +189,27 @@ export default function HackerGroupDetailPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ group_id: group.id }),
         });
-        const data = await res.json();
-        token = data.token || `inv-${group.slug}`;
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to create invite link.");
+        }
+        if (!data?.token) {
+          throw new Error("Invite was not returned. Please try again.");
+        }
+        token = data.token;
         setInviteToken(token);
       }
 
       const fullInviteUrl = `${window.location.origin}/hacker-groups/join/${token}`;
-      await navigator.clipboard.writeText(fullInviteUrl);
+      try {
+        await navigator.clipboard.writeText(fullInviteUrl);
+      } catch {
+        throw new Error("Copy failed. Copy the invite link manually from the address bar after opening it.");
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback copy
-      const fallbackUrl = `${window.location.origin}/hacker-groups/join/demo-${group.slug}`;
-      await navigator.clipboard.writeText(fallbackUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to copy invite link.");
     }
   };
 
@@ -178,8 +218,9 @@ export default function HackerGroupDetailPage() {
     if (!githubUsername.trim() || !group) return;
 
     setInviting(true);
+    setInviteError(null);
     try {
-      await fetch("/api/hacker-groups/invite", {
+      const res = await fetch("/api/hacker-groups/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -187,6 +228,10 @@ export default function HackerGroupDetailPage() {
           github_username: githubUsername.trim(),
         }),
       });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to send invite.");
+      }
 
       setInviteSuccess(true);
       setTimeout(() => {
@@ -194,14 +239,8 @@ export default function HackerGroupDetailPage() {
         setInviteSuccess(false);
         setGithubUsername("");
       }, 1500);
-    } catch {
-      // Demo success fallback
-      setInviteSuccess(true);
-      setTimeout(() => {
-        setIsInviteOpen(false);
-        setInviteSuccess(false);
-        setGithubUsername("");
-      }, 1500);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to send invite.");
     } finally {
       setInviting(false);
     }
@@ -240,7 +279,7 @@ export default function HackerGroupDetailPage() {
     );
   }
 
-  // Private Group Gate
+  // Private Group Gate — no request-access endpoint exists, so show honest invite instructions.
   if (isGate) {
     return (
       <div className="min-h-screen bg-neutral-50/50 dark:bg-neutral-950 px-4 py-12">
@@ -269,24 +308,16 @@ export default function HackerGroupDetailPage() {
                 @{group.slug}
               </p>
               <p className="mt-3 text-sm text-neutral-500 dark:text-neutral-400">
-                This hacker group is private and invite-only. Membership is required to view live leaderboard rankings and peer commit updates.
+                This hacker group is private and invite-only. Ask a group owner for an invite link
+                (it looks like /hacker-groups/join/...) to get access.
               </p>
             </div>
 
-            <div className="mt-8 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
-              {accessRequested ? (
-                <div className="rounded-lg bg-neutral-100 p-3 text-xs font-medium text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200">
-                  Access requested! An owner will review your invitation.
-                </div>
-              ) : (
-                <Button
-                  onClick={() => setAccessRequested(true)}
-                  className="bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-950"
-                >
-                  Request Access
-                </Button>
-              )}
-            </div>
+            {error && (
+              <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                {error}
+              </div>
+            )}
           </Card>
         </div>
       </div>
@@ -294,6 +325,7 @@ export default function HackerGroupDetailPage() {
   }
 
   const isPublic = group.visibility === "public";
+  const isOwner = group.user_role === "owner";
 
   return (
     <div className="min-h-screen bg-neutral-50/50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
@@ -345,38 +377,45 @@ export default function HackerGroupDetailPage() {
               </p>
             </div>
 
-            {/* Header Action Buttons */}
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyInvite}
-                className="h-9 border-neutral-200 bg-white hover:bg-neutral-100 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-              >
-                {copied ? (
-                  <>
-                    <Check className="mr-1.5 h-3.5 w-3.5 text-neutral-950 dark:text-neutral-50" />
-                    Copied Link
-                  </>
-                ) : (
-                  <>
-                    <Copy className="mr-1.5 h-3.5 w-3.5 text-neutral-500" />
-                    Copy Invite Link
-                  </>
-                )}
-              </Button>
+            {/* Header Action Buttons — owners only */}
+            {isOwner && (
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyInvite}
+                  className="h-9 border-neutral-200 bg-white hover:bg-neutral-100 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="mr-1.5 h-3.5 w-3.5 text-neutral-950 dark:text-neutral-50" />
+                      Copied Link
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-1.5 h-3.5 w-3.5 text-neutral-500" />
+                      Copy Invite Link
+                    </>
+                  )}
+                </Button>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsInviteOpen(true)}
-                className="h-9 border-neutral-200 bg-white hover:bg-neutral-100 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-              >
-                <UserPlus className="mr-1.5 h-3.5 w-3.5 text-neutral-500" />
-                Invite by GitHub
-              </Button>
-            </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsInviteOpen(true)}
+                  className="h-9 border-neutral-200 bg-white hover:bg-neutral-100 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                >
+                  <UserPlus className="mr-1.5 h-3.5 w-3.5 text-neutral-500" />
+                  Invite by GitHub
+                </Button>
+              </div>
+            )}
           </div>
+          {inviteError && (
+            <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+              {inviteError}
+            </div>
+          )}
         </div>
 
         {/* Tabs: Leaderboard & Peer Activity Feed */}
@@ -400,23 +439,33 @@ export default function HackerGroupDetailPage() {
           <TabsContent value="leaderboard" className="space-y-4">
             {leaderboard.length === 0 ? (
               <EmptyState
-                title="No members yet — share the invite link."
-                description="Invite fellow engineers to this hacker group to start tracking activity scores and 7-day momentum."
+                title={
+                  (group?.member_count ?? 0) > 0
+                    ? "Scores are calculating — check back soon."
+                    : "No members yet — share the invite link."
+                }
+                description={
+                  (group?.member_count ?? 0) > 0
+                    ? "The daily leaderboard snapshot hasn't been computed yet. Scores appear after the first compute."
+                    : "Invite fellow engineers to this hacker group to start tracking activity scores and 7-day momentum."
+                }
                 action={
-                  <Button
-                    onClick={handleCopyInvite}
-                    className="bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-950"
-                  >
-                    <Share2 className="mr-2 h-4 w-4" />
-                    Copy Invite Link
-                  </Button>
+                  isOwner ? (
+                    <Button
+                      onClick={handleCopyInvite}
+                      className="bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-950"
+                    >
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Copy Invite Link
+                    </Button>
+                  ) : undefined
                 }
               />
             ) : (
               <div className="rounded-xl border border-neutral-200 bg-white shadow-xs overflow-hidden dark:border-neutral-800 dark:bg-neutral-900">
                 {/* Responsive Leaderboard Table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table aria-label="Hacker group leaderboard with rank deltas" className="w-full text-left text-sm">
                     <thead className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:border-neutral-800/80 dark:bg-neutral-900/50 dark:text-neutral-400">
                       <tr>
                         <th scope="col" className="py-3 px-4 w-16 text-center">Rank</th>
@@ -430,18 +479,20 @@ export default function HackerGroupDetailPage() {
                     </thead>
                     <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60">
                       {leaderboard.map((member) => {
-                        const isCurrentUser = member.user_id === DEMO_USER_ID;
+                        const isCurrentUser = Boolean(currentUserId) && member.user_id === currentUserId;
 
-                        // Delta rendering
+                        // Delta rendering — avoid double-negative (val is always absolute)
                         let deltaText = "–";
                         let deltaColor = "text-neutral-400 dark:text-neutral-500";
 
                         if (member.delta.direction === "up" || member.delta.indicator === "up") {
-                          const val = member.delta.delta || member.delta.change || 0;
+                          const raw = member.delta.delta ?? member.delta.change ?? 0;
+                          const val = Math.abs(raw);
                           deltaText = `▲ +${val}`;
                           deltaColor = "text-emerald-600 dark:text-emerald-400 font-semibold";
                         } else if (member.delta.direction === "down" || member.delta.indicator === "down") {
-                          const val = member.delta.delta || Math.abs(member.delta.change || 0);
+                          const raw = member.delta.delta ?? member.delta.change ?? 0;
+                          const val = Math.abs(raw);
                           deltaText = `▼ -${val}`;
                           deltaColor = "text-rose-600 dark:text-rose-400 font-semibold";
                         }
@@ -474,11 +525,26 @@ export default function HackerGroupDetailPage() {
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <div className="flex items-center gap-3">
                                 {member.avatar_url ? (
-                                  <img
-                                    src={member.avatar_url}
-                                    alt={member.display_name}
-                                    className="h-9 w-9 rounded-full object-cover border border-neutral-200 dark:border-neutral-800 shrink-0"
-                                  />
+                                  member.avatar_url.startsWith("data:") ||
+                                  member.avatar_url.startsWith("blob:") ? (
+                                    <img
+                                      src={member.avatar_url}
+                                      alt={`${member.display_name} avatar`}
+                                      loading="lazy"
+                                      decoding="async"
+                                      className="h-9 w-9 rounded-full object-cover border border-neutral-200 dark:border-neutral-800 shrink-0"
+                                    />
+                                  ) : (
+                                    <Image
+                                      src={member.avatar_url}
+                                      alt={`${member.display_name} avatar`}
+                                      width={36}
+                                      height={36}
+                                      loading="lazy"
+                                      sizes="36px"
+                                      className="h-9 w-9 rounded-full object-cover border border-neutral-200 dark:border-neutral-800 shrink-0"
+                                    />
+                                  )
                                 ) : (
                                   <div className="h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-xs font-semibold text-neutral-700 dark:text-neutral-300 shrink-0">
                                     {member.display_name.slice(0, 2).toUpperCase()}
@@ -494,7 +560,7 @@ export default function HackerGroupDetailPage() {
                                       {member.display_name}
                                     </Link>
                                     {isCurrentUser && (
-                                      <span className="rounded bg-neutral-200 px-1 py-0.2 text-[10px] font-bold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                                      <span className="rounded bg-neutral-200 px-1 py-0.5 text-[10px] font-bold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                                         You
                                       </span>
                                     )}
@@ -538,7 +604,10 @@ export default function HackerGroupDetailPage() {
 
                             {/* Delta Indicator */}
                             <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              <span className={cn("text-xs font-mono", deltaColor)}>
+                              <span
+                                aria-label={`Rank delta ${deltaText}`}
+                                className={cn("text-xs font-mono", deltaColor)}
+                              >
                                 {deltaText}
                               </span>
                             </td>
@@ -567,17 +636,12 @@ export default function HackerGroupDetailPage() {
                   return (
                     <div key={item.id} className="p-4 flex items-start gap-3.5">
                       {/* Avatar */}
-                      {item.avatar_url ? (
-                        <img
-                          src={item.avatar_url}
-                          alt={item.user_name}
-                          className="h-9 w-9 rounded-full object-cover border border-neutral-200 dark:border-neutral-800 shrink-0 mt-0.5"
-                        />
-                      ) : (
-                        <div className="h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-xs font-semibold text-neutral-700 dark:text-neutral-300 shrink-0 mt-0.5">
-                          {item.user_name.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
+                      <Avatar
+                        src={item.avatar_url}
+                        alt={item.user_name}
+                        fallback={item.user_name.slice(0, 2).toUpperCase()}
+                        className="h-9 w-9 mt-0.5"
+                      />
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
@@ -620,7 +684,8 @@ export default function HackerGroupDetailPage() {
         </Tabs>
       </div>
 
-      {/* Invite by GitHub Username Dialog */}
+      {/* Invite by GitHub Username Dialog — owners only */}
+      {isOwner && (
       <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -636,12 +701,18 @@ export default function HackerGroupDetailPage() {
                 Invite sent successfully!
               </div>
             )}
+            {inviteError && (
+              <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                {inviteError}
+              </div>
+            )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor="invite-github-username" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 GitHub Username
               </label>
               <Input
+                id="invite-github-username"
                 placeholder="e.g. torvalds"
                 value={githubUsername}
                 onChange={(e) => setGithubUsername(e.target.value)}
@@ -671,6 +742,7 @@ export default function HackerGroupDetailPage() {
           </form>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, use, useId } from "react";
+import { useState, useEffect, useId } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +20,6 @@ import {
   Monitor,
   Smartphone,
   Tablet,
-  Copy,
-  Check,
   RefreshCw,
   ExternalLink,
   Save,
@@ -43,106 +41,106 @@ interface ProjectData {
   id: string;
   name: string;
   showcase_slug: string;
-  description: string;
-  readme_summary: string;
+  description: string | null;
+  readme_summary: string | null;
   tags: string[];
-  live_url: string;
+  live_url: string | null;
   status: "active" | "archived";
   telemetry_slug: string;
-  mockups: MockupItem[];
+  owner_id: string;
 }
-
-const DEFAULT_PROJECTS: Record<string, ProjectData> = {
-  p1: {
-    id: "p1",
-    name: "Pholio",
-    showcase_slug: "pholio",
-    description: "Self-maintaining showcase for product builders",
-    readme_summary:
-      "Automated living showcase for product builders. Connect GitHub once, showcase projects, and measure visitor pulse automatically with coding agent support.",
-    tags: ["Next.js", "TypeScript", "Tailwind CSS"],
-    live_url: "https://pholio.dev",
-    status: "active",
-    telemetry_slug: "pholio-demo",
-    mockups: [
-      {
-        id: "m1",
-        storage_path:
-          "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80",
-        device: "browser",
-        sort: 0,
-      },
-    ],
-  },
-  p2: {
-    id: "p2",
-    name: "Bankroll",
-    showcase_slug: "bankroll",
-    description: "Sports wagering and capital management mobile application",
-    readme_summary:
-      "Automated ML prediction engine with multi-leg wagering baskets and risk management built with React Native and Expo.",
-    tags: ["React Native", "Expo", "FastAPI"],
-    live_url: "https://bankroll.ng",
-    status: "active",
-    telemetry_slug: "bankroll-demo",
-    mockups: [
-      {
-        id: "m2",
-        storage_path:
-          "https://images.unsplash.com/photo-1555774698-0b77e0d5fac6?auto=format&fit=crop&w=800&q=80",
-        device: "phone",
-        sort: 0,
-      },
-    ],
-  },
-  p3: {
-    id: "p3",
-    name: "Chronos",
-    showcase_slug: "chronos",
-    description: "Distributed cron runner and event scheduler engine",
-    readme_summary:
-      "High-throughput fault-tolerant task scheduler built on Redis and Postgres logical replication.",
-    tags: ["Go", "PostgreSQL", "Redis"],
-    live_url: "",
-    status: "archived",
-    telemetry_slug: "chronos-demo",
-    mockups: [],
-  },
-};
 
 export default function ProjectEditorPage() {
   const params = useParams();
-  const id = (params?.id as string) || "p1";
+  const router = useRouter();
+  const id = params?.id as string;
 
-  const initial = DEFAULT_PROJECTS[id] || {
-    id,
-    name: "My Project",
-    showcase_slug: "my-project",
-    description: "A fast, modern web application.",
-    readme_summary: "Detailed project documentation and overview.",
-    tags: ["TypeScript", "Next.js"],
-    live_url: "https://example.com",
-    status: "active",
-    telemetry_slug: `${id}-telemetry`,
-    mockups: [],
-  };
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const [profileSlug, setProfileSlug] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [name, setName] = useState(initial.name);
-  const [description, setDescription] = useState(initial.description);
-  const [readmeSummary, setReadmeSummary] = useState(initial.readme_summary);
-  const [tags, setTags] = useState<string[]>(initial.tags);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [readmeSummary, setReadmeSummary] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [liveUrl, setLiveUrl] = useState(initial.live_url);
-  const [status, setStatus] = useState<"active" | "archived">(initial.status);
-  const [mockups, setMockups] = useState<MockupItem[]>(initial.mockups);
+  const [liveUrl, setLiveUrl] = useState("");
+  const [status, setStatus] = useState<"active" | "archived">("active");
+  const [mockups, setMockups] = useState<MockupItem[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [resynced, setResynced] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const fileInputId = useId();
+  const nameInputId = useId();
+  const taglineInputId = useId();
+  const readmeInputId = useId();
+  const tagsInputId = useId();
+  const liveUrlInputId = useId();
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!id) return;
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [projectRes, mockupsRes, profileRes] = await Promise.all([
+          fetch(`/api/projects/${id}`),
+          fetch(`/api/mockups?project_id=${encodeURIComponent(id)}`),
+          fetch("/api/profile"),
+        ]);
+        if (!projectRes.ok) {
+          throw new Error(
+            projectRes.status === 404
+              ? "Project not found."
+              : "Failed to load project."
+          );
+        }
+        const projectData = await projectRes.json();
+        const p: ProjectData = projectData.project;
+        if (!cancelled) {
+          setProject(p);
+          setName(p.name || "");
+          setDescription(p.description || "");
+          setReadmeSummary(p.readme_summary || "");
+          setTags(p.tags || []);
+          setLiveUrl(p.live_url || "");
+          setStatus(p.status || "active");
+        }
+        if (mockupsRes.ok && !cancelled) {
+          const mockupsData = await mockupsRes.json();
+          const items = (mockupsData.mockups || [])
+            .slice()
+            .sort((a: MockupItem, b: MockupItem) => a.sort - b.sort)
+            .slice(0, 50);
+          setMockups(items);
+        }
+        if (profileRes.ok && !cancelled) {
+          const profileData = await profileRes.json();
+          setProfileSlug(profileData.profile?.slug || null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(
+            err instanceof Error ? err.message : "Failed to load project."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   // Tags management
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -160,22 +158,17 @@ export default function ProjectEditorPage() {
     setTags(tags.filter((t) => t !== tagToRemove));
   };
 
-  // Mockups management
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Mockups management — real API
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const file = files[0];
-    const allowedTypes = [
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-      "image/svg+xml",
-    ];
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
 
     if (!allowedTypes.includes(file.type)) {
-      setUploadError("Invalid file type. Please upload a PNG, JPG, WEBP, or SVG.");
+      setUploadError("Invalid file type. Please upload a PNG, JPG, or WEBP.");
       return;
     }
 
@@ -184,27 +177,76 @@ export default function ProjectEditorPage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const result = loadEvent.target?.result as string;
-      if (result) {
-        const newMockup: MockupItem = {
-          id: `mockup-${Date.now()}`,
-          storage_path: result,
-          device: "browser",
-          sort: mockups.length,
-        };
-        setMockups([...mockups, newMockup]);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("project_id", id);
+      formData.append("device", "browser");
+      formData.append("file", file);
+      const res = await fetch("/api/mockups", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Upload failed.");
       }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+      const data = await res.json();
+      if (data.mockup) {
+        setMockups((prev) =>
+          [...prev, data.mockup].slice(0, 50).map((m, i) => ({ ...m, sort: i }))
+        );
+      }
+      router.refresh();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   };
 
-  const handleSetDevice = (mockupId: string, device: DeviceType) => {
-    setMockups(
-      mockups.map((m) => (m.id === mockupId ? { ...m, device } : m))
+  const persistOrder = async (ordered: MockupItem[]) => {
+    const prev = mockups;
+    try {
+      const res = await fetch("/api/mockups", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: id,
+          items: ordered.slice(0, 50).map((m, i) => ({ id: m.id, sort: i })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to save order.");
+      }
+    } catch (err) {
+      setMockups(prev);
+      setSaveError(err instanceof Error ? err.message : "Failed to save mockup order.");
+      throw err;
+    }
+  };
+
+  const handleSetDevice = async (mockupId: string, device: DeviceType) => {
+    const prev = mockups;
+    setMockups((cur) =>
+      cur.map((m) => (m.id === mockupId ? { ...m, device } : m))
     );
+    try {
+      const res = await fetch(`/api/mockups/device?project_id=${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: mockupId, device }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to update device frame.");
+      }
+    } catch (err) {
+      setMockups(prev);
+      setSaveError(err instanceof Error ? err.message : "Failed to update device frame.");
+    }
   };
 
   const handleMoveMockup = (index: number, direction: "up" | "down") => {
@@ -216,67 +258,138 @@ export default function ProjectEditorPage() {
     updated[index] = updated[targetIndex];
     updated[targetIndex] = temp;
 
-    // re-index sort
     const reordered = updated.map((m, i) => ({ ...m, sort: i }));
     setMockups(reordered);
+    persistOrder(reordered).catch(() => {
+      // rollback + error already handled in persistOrder
+    });
   };
 
-  const handleDeleteMockup = (mockupId: string) => {
-    setMockups(
-      mockups
-        .filter((m) => m.id !== mockupId)
-        .map((m, i) => ({ ...m, sort: i }))
+  const handleDeleteMockup = async (mockupId: string) => {
+    const prev = mockups;
+    setMockups((cur) =>
+      cur.filter((m) => m.id !== mockupId).map((m, i) => ({ ...m, sort: i }))
     );
+    try {
+      const res = await fetch(
+        `/api/mockups?id=${encodeURIComponent(mockupId)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Delete failed");
+      router.refresh();
+    } catch {
+      setMockups(prev);
+      setUploadError("Failed to delete mockup. Please try again.");
+    }
   };
 
-  // GitHub Resync
+  // GitHub Resync — real API, no fake success
   const handleResync = async () => {
     setSyncing(true);
+    setSaveError(null);
     try {
-      await fetch("/api/github/resync", {
+      const res = await fetch("/api/github/resync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: id }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Resync failed. Please try again.");
+      }
       setResynced(true);
-      setTimeout(() => setResynced(false), 3000);
-    } catch {
-      setResynced(true);
-      setTimeout(() => setResynced(false), 3000);
+      router.refresh();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Resync failed.");
     } finally {
       setSyncing(false);
     }
   };
 
-  // Save changes
-  const handleSave = (e: React.FormEvent) => {
+  // Save changes — real PATCH, no setTimeout fake
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    setSaved(false);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/projects?id=${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim(),
+          readme_summary: readmeSummary.trim(),
+          tags,
+          live_url: liveUrl.trim() || null,
+          status,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Save failed. Please try again.");
+      }
+      const data = await res.json();
+      if (data.project) setProject(data.project);
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    }, 400);
+      router.refresh();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Telemetry status query
+  const showcaseSlug = project?.showcase_slug || "";
+  const telemetrySlug = project?.telemetry_slug || "";
   const { data: telemetryStats } = useQuery<{
     totals?: { visitors_7d: number; actives_7d: number };
   }>({
-    queryKey: ["telemetry-stats", initial.showcase_slug, 7],
+    queryKey: ["telemetry-stats", showcaseSlug, 7],
     queryFn: async () => {
-      const slug = initial.showcase_slug || initial.telemetry_slug;
+      const slug = showcaseSlug || telemetrySlug;
+      if (!slug) return null;
       const res = await fetch(`/api/stats?project_slug=${encodeURIComponent(slug)}&days=7`);
       if (!res.ok) return null;
       return res.json();
     },
-    refetchInterval: 60_000,
+    enabled: Boolean(showcaseSlug || telemetrySlug),
   });
 
-  const hasEvents = Boolean(
-    (telemetryStats?.totals?.visitors_7d ?? 0) > 0 ||
-    ["pholio-demo", "bankroll-demo"].includes(initial.telemetry_slug)
-  );
+  const hasEvents = Boolean((telemetryStats?.totals?.visitors_7d ?? 0) > 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-8 pb-16" aria-busy="true" aria-label="Loading project">
+        <div className="h-10 rounded-lg bg-neutral-100 dark:bg-neutral-900 animate-pulse" />
+        <div className="h-64 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/40 animate-pulse" />
+        <div className="h-48 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/40 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (loadError || !project) {
+    return (
+      <div className="space-y-6 pb-16">
+        <Link href="/dashboard/projects">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-1.5" aria-hidden="true" />
+            Projects
+          </Button>
+        </Link>
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+        >
+          {loadError || "Project not found."}
+        </div>
+      </div>
+    );
+  }
+
+  const publicHref =
+    profileSlug && project ? `/${profileSlug}/${project.showcase_slug}` : null;
 
   return (
     <div className="space-y-8 pb-16">
@@ -289,11 +402,11 @@ export default function ProjectEditorPage() {
               size="sm"
               className="text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-neutral-100"
             >
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <ArrowLeft className="h-4 w-4 mr-1.5" aria-hidden="true" />
               Projects
             </Button>
           </Link>
-          <span className="text-neutral-300 dark:text-neutral-700">/</span>
+          <span className="text-neutral-300 dark:text-neutral-700" aria-hidden="true">/</span>
           <h1 className="text-lg font-bold text-neutral-950 dark:text-neutral-50 tracking-tight">
             {name || "Edit Project"}
           </h1>
@@ -305,9 +418,11 @@ export default function ProjectEditorPage() {
             size="sm"
             onClick={handleResync}
             disabled={syncing}
+            aria-label={`Resync ${name} from GitHub`}
             className="text-xs border-neutral-200 dark:border-neutral-800"
           >
             <RefreshCw
+              aria-hidden="true"
               className={`h-3.5 w-3.5 mr-1.5 ${
                 syncing ? "animate-spin" : "text-neutral-500"
               }`}
@@ -315,19 +430,19 @@ export default function ProjectEditorPage() {
             {syncing ? "Syncing..." : resynced ? "Resynced" : "GitHub Resync"}
           </Button>
 
-          <Link
-            href={`/tobi/${initial.showcase_slug}`}
-            target="_blank"
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs border-neutral-200 dark:border-neutral-800"
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5 text-neutral-500" />
-              View Public
-            </Button>
-          </Link>
+          {publicHref && (
+            <Link href={publicHref} target="_blank">
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={`View ${name} public showcase`}
+                className="text-xs border-neutral-200 dark:border-neutral-800"
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5 text-neutral-500" aria-hidden="true" />
+                View Public
+              </Button>
+            </Link>
+          )}
 
           <Button
             size="sm"
@@ -339,18 +454,28 @@ export default function ProjectEditorPage() {
               "Saving..."
             ) : saved ? (
               <>
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-white" />
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-white" aria-hidden="true" />
                 Saved
               </>
             ) : (
               <>
-                <Save className="h-3.5 w-3.5 mr-1.5" />
+                <Save className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
                 Save Changes
               </>
             )}
           </Button>
         </div>
       </div>
+
+      {saveError && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{saveError}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="space-y-8">
         {/* Basic Project Information */}
@@ -365,10 +490,11 @@ export default function ProjectEditorPage() {
             {/* Project Name & Status */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2 space-y-1.5">
-                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                <label htmlFor={nameInputId} className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                   Project Name
                 </label>
                 <Input
+                  id={nameInputId}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Pholio"
@@ -376,13 +502,18 @@ export default function ProjectEditorPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                <span id="status-label" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                   Status
-                </label>
-                <div className="grid grid-cols-2 gap-1 p-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                </span>
+                <div
+                  role="group"
+                  aria-labelledby="status-label"
+                  className="grid grid-cols-2 gap-1 p-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700"
+                >
                   <button
                     type="button"
                     onClick={() => setStatus("active")}
+                    aria-pressed={status === "active"}
                     className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                       status === "active"
                         ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-neutral-50 shadow-xs"
@@ -394,6 +525,7 @@ export default function ProjectEditorPage() {
                   <button
                     type="button"
                     onClick={() => setStatus("archived")}
+                    aria-pressed={status === "archived"}
                     className={`py-1.5 text-xs font-medium rounded-md transition-all ${
                       status === "archived"
                         ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-neutral-50 shadow-xs"
@@ -408,10 +540,11 @@ export default function ProjectEditorPage() {
 
             {/* Tagline / Short description */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor={taglineInputId} className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 Tagline / Short Description
               </label>
               <Input
+                id={taglineInputId}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief one-line summary of what you built"
@@ -420,10 +553,11 @@ export default function ProjectEditorPage() {
 
             {/* Readme Summary / Full Description */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor={readmeInputId} className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 Full Description / Readme Summary
               </label>
               <textarea
+                id={readmeInputId}
                 value={readmeSummary}
                 onChange={(e) => setReadmeSummary(e.target.value)}
                 rows={4}
@@ -434,7 +568,7 @@ export default function ProjectEditorPage() {
 
             {/* Tags & Tech Stack */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor={tagsInputId} className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 Tech Stack Tags
               </label>
               <div className="flex flex-wrap items-center gap-1.5 mb-2">
@@ -448,14 +582,16 @@ export default function ProjectEditorPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
+                      aria-label={`Remove tag ${tag}`}
                       className="hover:text-red-500 transition-colors"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </Badge>
                 ))}
               </div>
               <Input
+                id={tagsInputId}
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleAddTag}
@@ -466,10 +602,11 @@ export default function ProjectEditorPage() {
 
             {/* Live URL */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              <label htmlFor={liveUrlInputId} className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 Live URL
               </label>
               <Input
+                id={liveUrlInputId}
                 type="url"
                 value={liveUrl}
                 onChange={(e) => setLiveUrl(e.target.value)}
@@ -493,8 +630,9 @@ export default function ProjectEditorPage() {
               <input
                 id={fileInputId}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                accept="image/png,image/jpeg,image/webp"
                 onChange={handleFileUpload}
+                disabled={uploading}
                 className="hidden"
               />
               <label
@@ -502,19 +640,19 @@ export default function ProjectEditorPage() {
                 className="cursor-pointer border-2 border-dashed border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 rounded-xl p-6 flex flex-col items-center justify-center text-center transition-colors bg-neutral-50/50 dark:bg-neutral-950/50"
               >
                 <div className="h-10 w-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-300 mb-2">
-                  <Upload className="h-5 w-5" />
+                  <Upload className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
-                  Click to upload screenshot
+                  {uploading ? "Uploading..." : "Click to upload screenshot"}
                 </div>
                 <p className="text-[11px] text-neutral-500 mt-0.5">
-                  PNG, JPG, WEBP, or SVG (max 5MB)
+                  PNG, JPG, or WEBP (max 5MB)
                 </p>
               </label>
 
               {uploadError && (
-                <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 mt-2">
-                  <AlertCircle className="h-4 w-4" />
+                <div role="alert" className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 mt-2">
+                  <AlertCircle className="h-4 w-4" aria-hidden="true" />
                   <span>{uploadError}</span>
                 </div>
               )}
@@ -540,41 +678,51 @@ export default function ProjectEditorPage() {
                         </span>
 
                         {/* Device selector */}
-                        <div className="flex items-center bg-white dark:bg-neutral-900 rounded-lg p-0.5 border border-neutral-200 dark:border-neutral-800 text-xs">
+                        <div
+                          role="group"
+                          aria-label={`Device frame for mockup ${index + 1}`}
+                          className="flex items-center bg-white dark:bg-neutral-900 rounded-lg p-0.5 border border-neutral-200 dark:border-neutral-800 text-xs"
+                        >
                           <button
                             type="button"
                             onClick={() => handleSetDevice(mockup.id, "browser")}
+                            aria-pressed={mockup.device === "browser"}
+                            aria-label="Browser frame"
                             className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all ${
                               mockup.device === "browser"
                                 ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-medium"
                                 : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950"
                             }`}
                           >
-                            <Monitor className="h-3 w-3" />
+                            <Monitor className="h-3 w-3" aria-hidden="true" />
                             Browser
                           </button>
                           <button
                             type="button"
                             onClick={() => handleSetDevice(mockup.id, "phone")}
+                            aria-pressed={mockup.device === "phone"}
+                            aria-label="Phone frame"
                             className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all ${
                               mockup.device === "phone"
                                 ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-medium"
                                 : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950"
                             }`}
                           >
-                            <Smartphone className="h-3 w-3" />
+                            <Smartphone className="h-3 w-3" aria-hidden="true" />
                             Phone
                           </button>
                           <button
                             type="button"
                             onClick={() => handleSetDevice(mockup.id, "tablet")}
+                            aria-pressed={mockup.device === "tablet"}
+                            aria-label="Tablet frame"
                             className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-all ${
                               mockup.device === "tablet"
                                 ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-medium"
                                 : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950"
                             }`}
                           >
-                            <Tablet className="h-3 w-3" />
+                            <Tablet className="h-3 w-3" aria-hidden="true" />
                             Tablet
                           </button>
                         </div>
@@ -590,8 +738,9 @@ export default function ProjectEditorPage() {
                           onClick={() => handleMoveMockup(index, "up")}
                           className="h-7 w-7 p-0"
                           title="Move up"
+                          aria-label={`Move mockup ${index + 1} up`}
                         >
-                          <ArrowUp className="h-3.5 w-3.5" />
+                          <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                         <Button
                           type="button"
@@ -601,8 +750,9 @@ export default function ProjectEditorPage() {
                           onClick={() => handleMoveMockup(index, "down")}
                           className="h-7 w-7 p-0"
                           title="Move down"
+                          aria-label={`Move mockup ${index + 1} down`}
                         >
-                          <ArrowDown className="h-3.5 w-3.5" />
+                          <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                         <Button
                           type="button"
@@ -611,8 +761,9 @@ export default function ProjectEditorPage() {
                           onClick={() => handleDeleteMockup(mockup.id)}
                           className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40"
                           title="Delete mockup"
+                          aria-label={`Delete mockup ${index + 1}`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                       </div>
                     </div>
@@ -622,7 +773,7 @@ export default function ProjectEditorPage() {
                       <DeviceFrame
                         device={mockup.device}
                         src={mockup.storage_path}
-                        alt={`${name} preview`}
+                        alt={`${name} preview ${index + 1}`}
                       />
                     </div>
                   </div>
@@ -660,8 +811,8 @@ export default function ProjectEditorPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <TelemetryChart
-              projectSlug={initial.showcase_slug}
-              telemetrySlug={initial.telemetry_slug}
+              projectSlug={showcaseSlug}
+              telemetrySlug={telemetrySlug}
             />
 
             <div className="border-t border-neutral-100 dark:border-neutral-800 pt-6">
@@ -669,7 +820,7 @@ export default function ProjectEditorPage() {
                 Embed Tracking Code
               </h4>
               <TelemetrySnippetTab
-                telemetrySlug={initial.telemetry_slug}
+                telemetrySlug={telemetrySlug}
                 hasEvents={hasEvents}
               />
             </div>

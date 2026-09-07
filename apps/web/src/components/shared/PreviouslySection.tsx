@@ -3,6 +3,7 @@ export interface ArchivedProject {
   name: string;
   year?: string;
   role?: string;
+  href?: string | null;
 }
 
 export function PreviouslySection({
@@ -29,7 +30,13 @@ export function PreviouslySection({
 
         {archivedProjects.map((p) => (
           <div key={p.id} className="flex items-center justify-between text-neutral-500">
-            <span>{p.name} {p.role && `— ${p.role}`}</span>
+            {p.href ? (
+              <a href={p.href} className="hover:underline underline-offset-4">
+                {p.name} {p.role && `— ${p.role}`}
+              </a>
+            ) : (
+              <span>{p.name} {p.role && `— ${p.role}`}</span>
+            )}
             {p.year && <span className="font-mono text-[11px]">{p.year}</span>}
           </div>
         ))}

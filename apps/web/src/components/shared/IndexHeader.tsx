@@ -11,11 +11,24 @@ export interface IndexHeaderProps {
 
 export function IndexHeader({
   displayName,
-  headline = "Designer & full-stack builder",
+  headline,
   avatarUrl,
   siteUrl,
-  joinedDate = "01/15/26",
+  joinedDate,
 }: IndexHeaderProps) {
+  let safeSiteUrl: string | null = null;
+  let siteLabel: string | null = null;
+  if (siteUrl) {
+    try {
+      const parsed = new URL(siteUrl);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        safeSiteUrl = siteUrl;
+        siteLabel = siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      }
+    } catch {
+      safeSiteUrl = null;
+    }
+  }
   return (
     <div className="space-y-4 pt-4 pb-6">
       <div className="flex items-center gap-3.5">
@@ -28,26 +41,28 @@ export function IndexHeader({
           <h1 className="text-base font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">
             {displayName}
           </h1>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {headline}
-          </p>
+          {headline && (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              {headline}
+            </p>
+          )}
         </div>
       </div>
 
       <div className="flex items-center gap-4 text-xs text-neutral-400">
-        {siteUrl && (
+        {safeSiteUrl && siteLabel && (
           <a
-            href={siteUrl}
+            href={safeSiteUrl}
             target="_blank"
             rel="noreferrer"
             className="underline underline-offset-4 text-neutral-700 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-neutral-100 flex items-center gap-1"
           >
-            <span>{siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}</span>
-            <ExternalLink className="h-3 w-3 opacity-60" />
+            <span>{siteLabel}</span>
+            <ExternalLink className="h-3 w-3 opacity-60" aria-hidden="true" />
           </a>
         )}
-        <span>&bull;</span>
-        <span>Member since {joinedDate}</span>
+        {safeSiteUrl && joinedDate && <span aria-hidden="true">&bull;</span>}
+        {joinedDate && <span>Member since {joinedDate}</span>}
       </div>
     </div>
   );

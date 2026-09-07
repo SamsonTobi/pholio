@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,8 @@ export function ProjectRail({
               type="button"
               onClick={() => handleScroll(p.showcase_slug)}
               title={p.name}
+              aria-label={`Scroll to ${p.name}`}
+              aria-pressed={isActive}
               className={cn(
                 "h-10 w-10 rounded-xl overflow-hidden border transition-all cursor-pointer relative",
                 isActive
@@ -48,12 +51,25 @@ export function ProjectRail({
               )}
             >
               {p.icon_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={p.icon_url}
-                  alt={p.name}
-                  className="h-full w-full object-cover"
-                />
+                p.icon_url.startsWith("data:") || p.icon_url.startsWith("blob:") ? (
+                  <img
+                    src={p.icon_url}
+                    alt={p.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Image
+                    src={p.icon_url}
+                    alt={p.name}
+                    width={40}
+                    height={40}
+                    loading="lazy"
+                    sizes="40px"
+                    className="h-full w-full object-cover"
+                  />
+                )
               ) : (
                 <div className="h-full w-full bg-neutral-200 flex items-center justify-center font-bold text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                   {p.name.substring(0, 2).toUpperCase()}
@@ -67,9 +83,11 @@ export function ProjectRail({
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Show fewer projects" : "Show all projects"}
             className="h-8 w-8 rounded-lg flex items-center justify-center text-neutral-500 hover:text-neutral-900 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 transition-colors"
           >
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
           </button>
         )}
       </div>

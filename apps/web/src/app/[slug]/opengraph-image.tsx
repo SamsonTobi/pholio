@@ -18,7 +18,7 @@ export default async function Image({
   const { profile } = await getBySlug(slug);
 
   const displayName = profile?.display_name || slug;
-  const headline = profile?.headline || "Product engineer";
+  const headline = profile?.headline || null;
 
   return new ImageResponse(
     (
@@ -77,16 +77,18 @@ export default async function Image({
           {displayName}
         </div>
 
-        <div
-          style={{
-            fontSize: "32px",
-            color: "#a1a1aa",
-            textAlign: "center",
-            maxWidth: "800px",
-          }}
-        >
-          {headline}
-        </div>
+        {headline ? (
+          <div
+            style={{
+              fontSize: "32px",
+              color: "#a1a1aa",
+              textAlign: "center",
+              maxWidth: "800px",
+            }}
+          >
+            {headline}
+          </div>
+        ) : null}
       </div>
     ),
     {

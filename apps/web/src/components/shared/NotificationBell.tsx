@@ -34,80 +34,33 @@ export interface NotificationItem {
   created_at: string;
 }
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    user_id: "00000000-0000-0000-0000-000000000001",
-    type: "spike",
-    payload: {
-      title: "Growth spike detected",
-      message: "Pholio experienced a +45% increase in 7-day active visitors.",
-      url: "/dashboard/projects",
-      spike_percentage: 45,
-    },
-    read_at: null,
-    created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-  },
-  {
-    id: "notif-2",
-    user_id: "00000000-0000-0000-0000-000000000001",
-    type: "peer_push",
-    payload: {
-      title: "Peer pushed update",
-      message: "Siddharth pushed 4 commits to pholio (main branch).",
-      url: "/hacker-groups/lagos-hackers",
-      actor_name: "Siddharth Arun",
-    },
-    read_at: null,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: "notif-3",
-    user_id: "00000000-0000-0000-0000-000000000001",
-    type: "digest",
-    payload: {
-      title: "Weekly leaderboard digest",
-      message: "Lagos Hackers standings updated. You held #1 this week!",
-      url: "/hacker-groups/lagos-hackers",
-      group_name: "Lagos Hackers",
-      group_slug: "lagos-hackers",
-    },
-    read_at: null,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-  },
-  {
-    id: "notif-4",
-    user_id: "00000000-0000-0000-0000-000000000001",
-    type: "invite",
-    payload: {
-      title: "Group invite received",
-      message: "You have been invited to join YC W26 Builders.",
-      url: "/hacker-groups/yc-w26",
-      group_name: "YC W26 Builders",
-      group_slug: "yc-w26",
-    },
-    read_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
-  },
-];
-
 export function NotificationBell({ className }: { className?: string }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [notifications, setNotifications] = React.useState<NotificationItem[]>(DEFAULT_NOTIFICATIONS);
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const fetchNotifications = React.useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/notifications");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.notifications && Array.isArray(data.notifications)) {
-          setNotifications(data.notifications);
-        }
+      if (!res.ok) {
+        throw new Error("Failed to load notifications.");
+      }
+      const data = await res.json();
+      if (data.notifications && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications);
+      } else {
+        setNotifications([]);
       }
     } catch {
-      // Use existing/fallback notifications
+      setNotifications([]);
+      setLoadError("Couldn't load notifications. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -231,7 +184,18 @@ export function NotificationBell({ className }: { className?: string }) {
 
           {/* List */}
           <div className="max-h-96 overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-900">
-            {notifications.length === 0 ? (
+            {loading ? (
+              <div className="py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
+                Loading notifications...
+              </div>
+            ) : loadError ? (
+              <div
+                role="alert"
+                className="py-8 px-4 text-center text-xs text-neutral-500 dark:text-neutral-400"
+              >
+                {loadError}
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="py-8 text-center text-xs text-neutral-500 dark:text-neutral-400">
                 No notifications yet
               </div>
@@ -239,11 +203,13 @@ export function NotificationBell({ className }: { className?: string }) {
               notifications.map((n) => {
                 const isUnread = !n.read_at;
                 return (
-                  <div
+                  <button
                     key={n.id}
+                    type="button"
                     onClick={() => markAsRead(n.id, n.payload.url)}
+                    aria-label={`${n.payload.title || "Notification"}${isUnread ? " (unread)" : ""}`}
                     className={cn(
-                      "group flex cursor-pointer items-start gap-3 p-3.5 text-left transition-colors",
+                      "group flex w-full cursor-pointer items-start gap-3 p-3.5 text-left transition-colors",
                       isUnread
                         ? "bg-neutral-50/70 hover:bg-neutral-100/70 dark:bg-neutral-900/60 dark:hover:bg-neutral-900"
                         : "hover:bg-neutral-50 dark:hover:bg-neutral-900/40"
@@ -287,7 +253,7 @@ export function NotificationBell({ className }: { className?: string }) {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })
             )}

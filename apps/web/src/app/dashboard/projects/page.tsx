@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useDashboardUIStore, StatusFilter } from "@/stores/dashboard-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +20,7 @@ import {
   Star,
   Code2,
   CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 interface ProjectItem {
@@ -34,98 +37,86 @@ interface ProjectItem {
   status: "active" | "archived";
   last_push_at: string | null;
   telemetry_slug: string;
+  owner_id: string;
 }
 
-const INITIAL_PROJECTS: ProjectItem[] = [
-  {
-    id: "p1",
-    name: "Pholio",
-    showcase_slug: "pholio",
-    description: "Self-maintaining showcase for product builders",
-    readme_summary:
-      "Automated living showcase for product builders. Connect GitHub once, showcase projects, and measure visitor pulse automatically with coding agent support.",
-    icon_url: "https://api.dicebear.com/7.x/shapes/svg?seed=pholio",
-    tags: ["Next.js", "TypeScript", "Tailwind CSS"],
-    language: "TypeScript",
-    stars: 142,
-    live_url: "https://pholio.dev",
-    status: "active",
-    last_push_at: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    telemetry_slug: "pholio-demo",
-  },
-  {
-    id: "p2",
-    name: "Bankroll",
-    showcase_slug: "bankroll",
-    description: "Sports wagering and capital management mobile application",
-    readme_summary:
-      "Automated ML prediction engine with multi-leg wagering baskets and risk management built with React Native and Expo.",
-    icon_url: "https://api.dicebear.com/7.x/shapes/svg?seed=bankroll",
-    tags: ["React Native", "Expo", "FastAPI"],
-    language: "TypeScript",
-    stars: 88,
-    live_url: "https://bankroll.ng",
-    status: "active",
-    last_push_at: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-    telemetry_slug: "bankroll-demo",
-  },
-  {
-    id: "p3",
-    name: "Chronos",
-    showcase_slug: "chronos",
-    description: "Distributed cron runner and event scheduler engine",
-    readme_summary:
-      "High-throughput fault-tolerant task scheduler built on Redis and Postgres logical replication.",
-    icon_url: "https://api.dicebear.com/7.x/shapes/svg?seed=chronos",
-    tags: ["Go", "PostgreSQL", "Redis"],
-    language: "Go",
-    stars: 53,
-    live_url: null,
-    status: "archived",
-    last_push_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
-    telemetry_slug: "chronos-demo",
-  },
-];
-
 export default function ProjectsDashboardPage() {
+  const router = useRouter();
   const { searchQuery, setSearchQuery, statusFilter, setStatusFilter } =
     useDashboardUIStore();
 
-  const [projects, setProjects] = useState<ProjectItem[]>(INITIAL_PROJECTS);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [profileSlug, setProfileSlug] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [resyncedId, setResyncedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const [projectsRes, profileRes] = await Promise.all([
+          fetch("/api/projects"),
+          fetch("/api/profile"),
+        ]);
+        if (!projectsRes.ok) {
+          throw new Error(
+            projectsRes.status === 401
+              ? "Please log in to view your projects."
+              : "Failed to load projects."
+          );
+        }
+        const projectsData = await projectsRes.json();
+        if (!cancelled) {
+          setProjects(projectsData.projects || []);
+        }
+        if (profileRes.ok && !cancelled) {
+          const profileData = await profileRes.json();
+          setProfileSlug(profileData.profile?.slug || null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(
+            err instanceof Error ? err.message : "Failed to load projects."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleResync = async (projectId: string) => {
     setSyncingId(projectId);
+    setActionError(null);
     try {
       const res = await fetch("/api/github/resync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: projectId }),
       });
-
-      if (res.ok) {
-        setProjects((prev) =>
-          prev.map((p) =>
-            p.id === projectId
-              ? { ...p, last_push_at: new Date().toISOString() }
-              : p
-          )
-        );
-        setResyncedId(projectId);
-        setTimeout(() => setResyncedId(null), 3000);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Resync failed. Please try again.");
       }
-    } catch {
-      // Offline / demo fallback
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === projectId
-            ? { ...p, last_push_at: new Date().toISOString() }
-            : p
-        )
-      );
+      // Refresh from server for authoritative state
+      const listRes = await fetch("/api/projects");
+      if (listRes.ok) {
+        const data = await listRes.json();
+        setProjects(data.projects || []);
+      }
       setResyncedId(projectId);
-      setTimeout(() => setResyncedId(null), 3000);
+      router.refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Resync failed.");
     } finally {
       setSyncingId(null);
     }
@@ -133,12 +124,10 @@ export default function ProjectsDashboardPage() {
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
-      // Status filter
       if (statusFilter !== "all" && project.status !== statusFilter) {
         return false;
       }
 
-      // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = project.name.toLowerCase().includes(q);
@@ -152,7 +141,7 @@ export default function ProjectsDashboardPage() {
         const matchesLanguage = (project.language || "")
           .toLowerCase()
           .includes(q);
-        const matchesTags = project.tags.some((tag) =>
+        const matchesTags = (project.tags || []).some((tag) =>
           tag.toLowerCase().includes(q)
         );
 
@@ -182,6 +171,9 @@ export default function ProjectsDashboardPage() {
     { key: "archived", label: "Archived", count: counts.archived },
   ];
 
+  const publicHref = (project: ProjectItem) =>
+    profileSlug ? `/${profileSlug}/${project.showcase_slug}` : null;
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -195,20 +187,36 @@ export default function ProjectsDashboardPage() {
           </p>
         </div>
 
-        <Link href="/onboarding">
+        <Link href="/pick-repos">
           <Button size="sm">Import Repository</Button>
         </Link>
       </div>
 
+      {actionError && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{actionError}</span>
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         {/* Status Tabs */}
-        <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-lg dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
+        <div
+          role="tablist"
+          aria-label="Filter projects by status"
+          className="flex items-center gap-1 bg-neutral-100 p-1 rounded-lg dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800"
+        >
           {filterTabs.map((tab) => {
             const isActive = statusFilter === tab.key;
             return (
               <button
                 key={tab.key}
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => setStatusFilter(tab.key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   isActive
@@ -218,7 +226,7 @@ export default function ProjectsDashboardPage() {
               >
                 <span>{tab.label}</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                     isActive
                       ? "bg-neutral-100 text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100"
                       : "bg-neutral-200/60 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
@@ -233,8 +241,15 @@ export default function ProjectsDashboardPage() {
 
         {/* Search Input */}
         <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 dark:text-neutral-500" />
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 dark:text-neutral-500"
+            aria-hidden="true"
+          />
+          <label htmlFor="project-search" className="sr-only">
+            Search projects or tags
+          </label>
           <Input
+            id="project-search"
             placeholder="Search projects or tags..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -244,13 +259,38 @@ export default function ProjectsDashboardPage() {
       </div>
 
       {/* Projects Grid / List */}
-      {filteredProjects.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4" aria-busy="true" aria-label="Loading projects">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-28 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/60 dark:bg-neutral-900/40 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : loadError ? (
+        <EmptyState
+          title="Failed to load projects"
+          description={loadError}
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          }
+        />
+      ) : filteredProjects.length === 0 ? (
         <EmptyState
           title="No projects found"
           description={
             searchQuery.trim()
               ? `No projects match "${searchQuery}". Try a different keyword.`
-              : "No projects match the selected status filter."
+              : projects.length === 0
+                ? "Import a repository to get started."
+                : "No projects match the selected status filter."
           }
           action={
             searchQuery.trim() ? (
@@ -261,158 +301,162 @@ export default function ProjectsDashboardPage() {
               >
                 Clear Search
               </Button>
+            ) : projects.length === 0 ? (
+              <Link href="/pick-repos">
+                <Button size="sm">Import Repository</Button>
+              </Link>
             ) : null
           }
         />
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {filteredProjects.map((project) => (
-            <Card
-              key={project.id}
-              className="border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
-            >
-              <CardContent className="p-5">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  {/* Left: Icon and Project Meta */}
-                  <div className="flex items-start gap-4">
-                    {/* Project Icon */}
-                    {project.icon_url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={project.icon_url}
-                        alt={project.name}
-                        className="w-10 h-10 rounded-lg object-cover border border-neutral-200 dark:border-neutral-800 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center font-bold text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-800 shrink-0 text-sm">
-                        {project.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-
-                    {/* Details */}
-                    <div className="space-y-1.5 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/dashboard/projects/${project.id}`}
-                          className="font-semibold text-base text-neutral-950 dark:text-neutral-50 hover:underline"
-                        >
-                          {project.name}
-                        </Link>
-                        <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
-                          /{project.showcase_slug}
-                        </span>
-
-                        <StatusPill
-                          status={
-                            project.status === "active" ? "Active" : "Archived"
-                          }
-                          className={
-                            project.status === "archived"
-                              ? "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
-                              : ""
-                          }
+          {filteredProjects.map((project) => {
+            const href = publicHref(project);
+            return (
+              <Card
+                key={project.id}
+                className="border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/90 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+              >
+                <CardContent className="p-5">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    {/* Left: Icon and Project Meta */}
+                    <div className="flex items-start gap-4">
+                      {/* Project Icon */}
+                      {project.icon_url ? (
+                        <Image
+                          src={project.icon_url}
+                          alt={`${project.name} icon`}
+                          width={40}
+                          height={40}
+                          loading="lazy"
+                          sizes="40px"
+                          className="w-10 h-10 rounded-lg object-cover border border-neutral-200 dark:border-neutral-800 shrink-0"
                         />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center font-bold text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-800 shrink-0 text-sm">
+                          {project.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
 
-                        {resyncedId === project.id && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400 font-medium">
-                            <CheckCircle2 className="h-3 w-3" /> Resynced
+                      {/* Details */}
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/dashboard/projects/${project.id}`}
+                            className="font-semibold text-base text-neutral-950 dark:text-neutral-50 hover:underline"
+                          >
+                            {project.name}
+                          </Link>
+                          <span className="font-mono text-xs text-neutral-400 dark:text-neutral-500">
+                            /{project.showcase_slug}
                           </span>
-                        )}
-                      </div>
 
-                      <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2 max-w-2xl">
-                        {project.description || project.readme_summary}
-                      </p>
+                          <StatusPill status={project.status} />
 
-                      {/* Tech stack badges & metadata */}
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        {project.language && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] font-mono font-normal border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300"
-                          >
-                            <Code2 className="h-2.5 w-2.5 mr-1" />
-                            {project.language}
-                          </Badge>
-                        )}
-
-                        {project.tags.map((tag) => (
-                          <Badge
-                            key={tag}
-                            variant="secondary"
-                            className="text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-normal hover:bg-neutral-200"
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-
-                        <div className="flex items-center gap-1 text-[11px] text-neutral-500 font-mono ml-1">
-                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                          <span>{project.stars}</span>
+                          {resyncedId === project.id && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400 font-medium">
+                              <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> Resynced
+                            </span>
+                          )}
                         </div>
 
-                        <span className="text-neutral-300 dark:text-neutral-700 text-xs">
-                          •
-                        </span>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2 max-w-2xl">
+                          {project.description || project.readme_summary || "No description provided."}
+                        </p>
 
-                        <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                          <TimeAgo
-                            date={project.last_push_at}
-                            prefix="Updated"
-                          />
+                        {/* Tech stack badges & metadata */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {project.language && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-mono font-normal border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300"
+                            >
+                              <Code2 className="h-2.5 w-2.5 mr-1" aria-hidden="true" />
+                              {project.language}
+                            </Badge>
+                          )}
+
+                          {(project.tags || []).map((tag) => (
+                            <Badge
+                              key={tag}
+                              variant="secondary"
+                              className="text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-normal hover:bg-neutral-200"
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
+
+                          <div className="flex items-center gap-1 text-[11px] text-neutral-500 font-mono ml-1">
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+                            <span>{project.stars}</span>
+                          </div>
+
+                          <span className="text-neutral-300 dark:text-neutral-700 text-xs" aria-hidden="true">
+                            •
+                          </span>
+
+                          <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                            <TimeAgo
+                              date={project.last_push_at}
+                              prefix="Updated"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-1.5 self-end md:self-start shrink-0">
-                    <Link href={`/dashboard/projects/${project.id}`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                      >
-                        <Pencil className="h-3.5 w-3.5 mr-1 text-neutral-500" />
-                        Edit
-                      </Button>
-                    </Link>
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-1.5 self-end md:self-start shrink-0">
+                      <Link href={`/dashboard/projects/${project.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Edit ${project.name}`}
+                          className="h-8 text-xs border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1 text-neutral-500" aria-hidden="true" />
+                          Edit
+                        </Button>
+                      </Link>
 
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleResync(project.id)}
-                      disabled={syncingId === project.id}
-                      className="h-8 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                    >
-                      <RefreshCw
-                        className={`h-3.5 w-3.5 mr-1 ${
-                          syncingId === project.id
-                            ? "animate-spin text-neutral-950 dark:text-neutral-50"
-                            : "text-neutral-500"
-                        }`}
-                      />
-                      {syncingId === project.id ? "Syncing..." : "Resync"}
-                    </Button>
-
-                    <Link
-                      href={`/tobi/${project.showcase_slug}`}
-                      target="_blank"
-                    >
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => handleResync(project.id)}
+                        disabled={syncingId === project.id}
+                        aria-label={`Resync ${project.name} from GitHub`}
                         className="h-8 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                       >
-                        <ExternalLink className="h-3.5 w-3.5 mr-1 text-neutral-500" />
-                        View
+                        <RefreshCw
+                          aria-hidden="true"
+                          className={`h-3.5 w-3.5 mr-1 ${
+                            syncingId === project.id
+                              ? "animate-spin text-neutral-950 dark:text-neutral-50"
+                              : "text-neutral-500"
+                          }`}
+                        />
+                        {syncingId === project.id ? "Syncing..." : "Resync"}
                       </Button>
-                    </Link>
+
+                      {href && (
+                        <Link href={href} target="_blank">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`View ${project.name} showcase`}
+                            className="h-8 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1 text-neutral-500" aria-hidden="true" />
+                            View
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

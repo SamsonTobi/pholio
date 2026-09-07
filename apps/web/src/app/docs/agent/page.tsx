@@ -1,17 +1,12 @@
-"use client";
-
 import * as React from "react";
-import { useState } from "react";
 import Link from "next/link";
 import { MarketingNav, MarketingFooter } from "@/components/marketing-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { APP_URL } from "@/lib/env";
+import { CopyButton } from "./CopyButton";
 import {
   Bot,
-  Copy,
-  Check,
   Key,
   ExternalLink,
   Code2,
@@ -21,18 +16,6 @@ import {
 } from "lucide-react";
 
 export default function AgentDocsPage() {
-  const [copiedSection, setCopiedSection] = useState<string | null>(null);
-
-  const copyText = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedSection(id);
-      setTimeout(() => setCopiedSection(null), 2000);
-    } catch {
-      // Clipboard fallback
-    }
-  };
-
   const cursorSnippet = JSON.stringify(
     {
       mcpServers: {
@@ -120,7 +103,7 @@ When you make meaningful changes or ship features in this repository:
       name: "get_leaderboard",
       args: "group_slug?",
       desc: "Retrieves activity scores, push frequency, and rankings for a hacker group.",
-      sample: 'get_leaderboard({ group_slug: "lagos-hackers" })',
+      sample: 'get_leaderboard({ group_slug: "design-eng" })',
     },
   ];
 
@@ -218,24 +201,7 @@ When you make meaningful changes or ship features in this repository:
                 <pre className="p-3 rounded bg-neutral-950 text-neutral-100 font-mono text-[11px] overflow-x-auto">
                   {cursorSnippet}
                 </pre>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyText(cursorSnippet, "cursor")}
-                  className="w-full text-xs gap-1.5"
-                >
-                  {copiedSection === "cursor" ? (
-                    <>
-                      <Check className="h-3 w-3 text-emerald-500" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3" />
-                      Copy JSON
-                    </>
-                  )}
-                </Button>
+                <CopyButton text={cursorSnippet} idleLabel="Copy JSON" />
               </CardContent>
             </Card>
 
@@ -251,24 +217,7 @@ When you make meaningful changes or ship features in this repository:
                 <pre className="p-3 rounded bg-neutral-950 text-neutral-100 font-mono text-[11px] overflow-x-auto">
                   {claudeSnippet}
                 </pre>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyText(claudeSnippet, "claude")}
-                  className="w-full text-xs gap-1.5"
-                >
-                  {copiedSection === "claude" ? (
-                    <>
-                      <Check className="h-3 w-3 text-emerald-500" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3" />
-                      Copy JSON
-                    </>
-                  )}
-                </Button>
+                <CopyButton text={claudeSnippet} idleLabel="Copy JSON" />
               </CardContent>
             </Card>
 
@@ -284,24 +233,7 @@ When you make meaningful changes or ship features in this repository:
                 <pre className="p-3 rounded bg-neutral-950 text-neutral-100 font-mono text-[11px] overflow-x-auto">
                   {antigravitySnippet}
                 </pre>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyText(antigravitySnippet, "antigravity")}
-                  className="w-full text-xs gap-1.5"
-                >
-                  {copiedSection === "antigravity" ? (
-                    <>
-                      <Check className="h-3 w-3 text-emerald-500" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3" />
-                      Copy JSON
-                    </>
-                  )}
-                </Button>
+                <CopyButton text={antigravitySnippet} idleLabel="Copy JSON" />
               </CardContent>
             </Card>
           </div>
@@ -355,24 +287,7 @@ When you make meaningful changes or ship features in this repository:
                   Include this in your workspace AGENTS.md or agent system prompt so your agent knows when to update your showcase.
                 </CardDescription>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyText(masterPrompt, "prompt")}
-                className="gap-1.5 text-xs shrink-0"
-              >
-                {copiedSection === "prompt" ? (
-                  <>
-                    <Check className="h-3 w-3 text-emerald-500" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3" />
-                    Copy Prompt
-                  </>
-                )}
-              </Button>
+              <CopyButton text={masterPrompt} idleLabel="Copy Prompt" className="gap-1.5 text-xs shrink-0" />
             </div>
           </CardHeader>
           <CardContent>

@@ -1,8 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { getBySlug } from "@/features/profile/server/service";
 import { getProjectBySlug } from "@/features/projects/server/service";
 import { StoryProjectSection } from "@/components/shared/StoryProjectSection";
+import { APP_URL, projectDeepUrl } from "@/lib/env";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -18,9 +19,33 @@ export async function generateMetadata({
   const project = await getProjectBySlug(profile.id, projectSlug);
   if (!project) return { title: "Project Not Found | Pholio" };
 
+  const canonical = projectDeepUrl(profile.slug, project.showcase_slug);
+
   return {
     title: `${project.name} — ${profile.display_name || profile.slug} | Pholio`,
     description: project.description || `${project.name} showcase`,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: `${project.name} — ${profile.display_name || profile.slug}`,
+      description: project.description || `${project.name} showcase`,
+      url: canonical,
+      images: [
+        {
+          url: `${APP_URL}/${profile.slug}/opengraph-image`,
+          width: 1200,
+          height: 630,
+          alt: project.name,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${project.name} — ${profile.display_name || profile.slug}`,
+      description: project.description || `${project.name} showcase`,
+      images: [`${APP_URL}/${profile.slug}/opengraph-image`],
+    },
   };
 }
 
@@ -30,7 +55,10 @@ export default async function ProjectDeepPage({
   params: Promise<{ slug: string; projectSlug: string }>;
 }) {
   const { slug, projectSlug } = await params;
-  const { profile } = await getBySlug(slug);
+  const { profile, canonicalSlug } = await getBySlug(slug);
+  if (canonicalSlug && canonicalSlug !== slug) {
+    permanentRedirect(`/${canonicalSlug}/${projectSlug}`);
+  }
   if (!profile) notFound();
 
   const project = await getProjectBySlug(profile.id, projectSlug);
@@ -56,8 +84,10 @@ export default async function ProjectDeepPage({
           icon_url={project.icon_url}
           live_url={project.live_url}
           stars={project.stars}
+          status={project.status}
           last_push_at={project.last_push_at}
           mockupDevice={project.mockup?.device || "browser"}
+          mockupUrl={project.mockup?.storage_path}
           showcaseBodies={project.latestShowcases?.map((s) => s.body) || []}
         />
 

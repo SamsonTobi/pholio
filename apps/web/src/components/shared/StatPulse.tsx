@@ -26,8 +26,10 @@ export function StatPulse({
 }: StatPulseProps) {
   const needsFetch = visitors7d === undefined && Boolean(projectSlug);
 
+  // Share the ["telemetry-stats", slug, 7] cache key with TelemetryChart and
+  // dashboard queries so N pulses on one page batch into one network request.
   const { data } = useQuery<StatsApiResponse>({
-    queryKey: ["telemetry-stats-pulse", projectSlug],
+    queryKey: ["telemetry-stats", projectSlug, 7],
     queryFn: async () => {
       const res = await fetch(
         `/api/stats?project_slug=${encodeURIComponent(projectSlug!)}&days=7`

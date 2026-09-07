@@ -1,4 +1,5 @@
 import * as React from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -9,6 +10,7 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function Avatar({ className, src, alt, fallback, ...props }: AvatarProps) {
   const [error, setError] = React.useState(!src);
+  const isDataUrl = Boolean(src && (src.startsWith("data:") || src.startsWith("blob:")));
 
   return (
     <div
@@ -19,13 +21,26 @@ export function Avatar({ className, src, alt, fallback, ...props }: AvatarProps)
       {...props}
     >
       {src && !error ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt={alt || "Avatar"}
-          className="aspect-square h-full w-full object-cover"
-          onError={() => setError(true)}
-        />
+        isDataUrl ? (
+          <img
+            src={src}
+            alt={alt || "Avatar"}
+            loading="lazy"
+            decoding="async"
+            className="aspect-square h-full w-full object-cover"
+            onError={() => setError(true)}
+          />
+        ) : (
+          <Image
+            src={src}
+            alt={alt || "Avatar"}
+            fill
+            loading="lazy"
+            sizes="56px"
+            className="aspect-square h-full w-full object-cover"
+            onError={() => setError(true)}
+          />
+        )
       ) : (
         <span className="flex h-full w-full items-center justify-center font-medium text-xs text-neutral-600 dark:text-neutral-300">
           {fallback || alt?.substring(0, 2).toUpperCase() || "?"}

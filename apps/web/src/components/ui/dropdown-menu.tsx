@@ -42,9 +42,24 @@ export function DropdownMenuTrigger({
   const ctx = React.useContext(DropdownMenuContext);
   if (!ctx) throw new Error("DropdownMenuTrigger must be in DropdownMenu");
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      ctx.setOpen(!ctx.open);
+    } else if (e.key === "Escape") {
+      ctx.setOpen(false);
+    }
+  };
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-expanded={ctx.open}
+      aria-haspopup="menu"
+      aria-label="Open menu"
       onClick={() => ctx.setOpen(!ctx.open)}
+      onKeyDown={handleKeyDown}
       className={cn("cursor-pointer inline-flex", className)}
     >
       {children}
@@ -64,6 +79,8 @@ export function DropdownMenuContent({
 
   return (
     <div
+      role="menu"
+      aria-label="Menu options"
       className={cn(
         "absolute right-0 mt-2 w-48 rounded-md border border-neutral-200 bg-white p-1 text-neutral-950 shadow-md z-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-50",
         className
@@ -88,6 +105,8 @@ export function DropdownMenuItem({
   return (
     <button
       type="button"
+      role="menuitem"
+      aria-label={typeof children === "string" ? children : undefined}
       onClick={() => {
         onClick?.();
         ctx?.setOpen(false);

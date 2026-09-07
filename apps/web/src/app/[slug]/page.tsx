@@ -1,6 +1,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { getBySlug } from "@/features/profile/server/service";
 import { listProjectsByOwner } from "@/features/projects/server/service";
+import { getSessionUser } from "@/features/auth/server/service";
 import { APP_URL, showcaseUrl } from "@/lib/env";
 import { ShowcaseHeaderCard } from "@/components/shared/ShowcaseHeaderCard";
 import { ProjectRail } from "@/components/shared/ProjectRail";
@@ -13,6 +14,32 @@ import { PreviouslySection } from "@/components/shared/PreviouslySection";
 import { getLatestPinnedShowcase } from "@/features/showcases/server/service";
 import { ShowcaseRealtimeListener } from "@/components/shared/ShowcaseRealtimeListener";
 import type { Metadata } from "next";
+
+function formatJoinedDate(createdAt: string | null | undefined): string | null {
+  if (!createdAt) return null;
+  try {
+    const d = new Date(createdAt);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "2-digit",
+    });
+  } catch {
+    return null;
+  }
+}
+
+function projectYear(date: string | null | undefined): string | undefined {
+  if (!date) return undefined;
+  try {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return undefined;
+    return String(d.getFullYear());
+  } catch {
+    return undefined;
+  }
+}
 
 export async function generateMetadata({
   params,
@@ -29,16 +56,18 @@ export async function generateMetadata({
   }
 
   const name = result.profile.display_name || result.profile.slug;
-  const headline = result.profile.headline || "Product engineer";
+  const headline = result.profile.headline || null;
 
+  const title = headline ? `${name} — ${headline} | Pholio` : `${name} | Pholio`;
+  const ogTitle = headline ? `${name} — ${headline}` : name;
   return {
-    title: `${name} — ${headline} | Pholio`,
+    title,
     description: `${name}'s living showcase on Pholio.`,
     alternates: {
       canonical: showcaseUrl(result.profile.slug),
     },
     openGraph: {
-      title: `${name} — ${headline}`,
+      title: ogTitle,
       description: `Explore ${name}'s projects and updates on Pholio.`,
       url: showcaseUrl(result.profile.slug),
       images: [
@@ -50,15 +79,25 @@ export async function generateMetadata({
         },
       ],
     },
+    twitter: {
+      card: "summary_large_image",
+      title: ogTitle,
+      description: `Explore ${name}'s projects and updates on Pholio.`,
+      images: [`${APP_URL}/${result.profile.slug}/opengraph-image`],
+    },
   };
 }
 
 export default async function ShowcasePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { slug } = await params;
+  const { tab } = await searchParams;
+  const activeTab = tab === "information" ? "information" : "posts";
   const { profile, canonicalSlug } = await getBySlug(slug);
 
   if (canonicalSlug && canonicalSlug !== slug) {
@@ -69,12 +108,18 @@ export default async function ShowcasePage({
     notFound();
   }
 
-  const projects = await listProjectsByOwner(profile.id);
+  const [projects, pinnedShowcase, sessionUser] = await Promise.all([
+    listProjectsByOwner(profile.id),
+    getLatestPinnedShowcase(profile.id).catch(() => null),
+    getSessionUser().catch(() => null),
+  ]);
+
+  const isOwner = Boolean(sessionUser && sessionUser.id === profile.id);
   const activeProjects = projects.filter((p) => p.status !== "archived");
   const archivedProjects = projects.filter((p) => p.status === "archived");
 
-  const pinnedShowcase = await getLatestPinnedShowcase(profile.id).catch(() => null);
   const latestShowcase = pinnedShowcase || projects.flatMap((p) => p.latestShowcases || [])[0];
+  const joinedDate = formatJoinedDate(profile.created_at);
 
   // Variant A: Story template
   if (profile.template === "story") {
@@ -87,7 +132,7 @@ export default async function ShowcasePage({
             headline={profile.headline}
             avatarUrl={profile.avatar_url}
             siteUrl={profile.site_url}
-            joinedDate="01/15/26"
+            joinedDate={joinedDate}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-[64px_1fr] gap-8">
@@ -109,11 +154,13 @@ export default async function ShowcasePage({
                   id={project.id}
                   name={project.name}
                   showcase_slug={project.showcase_slug}
+                  href={`/${profile.slug}/${project.showcase_slug}`}
                   tagline={project.description}
                   readme_summary={project.readme_summary}
                   live_url={project.live_url}
                   icon_url={project.icon_url}
                   stars={project.stars}
+                  status={project.status}
                   last_push_at={project.last_push_at}
                   mockupDevice={project.mockup?.device || "browser"}
                   mockupUrl={project.mockup?.storage_path}
@@ -128,17 +175,18 @@ export default async function ShowcasePage({
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 opacity-60">
                     {archivedProjects.map((p) => (
-                      <div
+                      <a
                         key={p.id}
-                        className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50"
+                        href={`/${profile.slug}/${p.showcase_slug}`}
+                        className="block p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
                       >
-                        <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
+                        <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100 hover:underline underline-offset-4">
                           {p.name}
                         </div>
                         <div className="text-xs text-neutral-500 mt-1 line-clamp-2">
                           {p.description || "No description provided."}
                         </div>
-                      </div>
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -160,13 +208,13 @@ export default async function ShowcasePage({
           headline={profile.headline}
           avatarUrl={profile.avatar_url}
           siteUrl={profile.site_url}
-          joinedDate="01/15/26"
+          joinedDate={joinedDate}
         />
 
-        <IndexTabs isOwner={true} />
+        <IndexTabs isOwner={isOwner} activeTab={activeTab} />
 
         <NowSection
-          body={latestShowcase?.body || "Shipping the core foundation and telemetry tracker."}
+          body={latestShowcase?.body || null}
           date={latestShowcase?.published_at}
         />
 
@@ -182,10 +230,9 @@ export default async function ShowcasePage({
               name={project.name}
               subtitle={project.language}
               blurb={project.description}
-              thumbnails={[
-                "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&q=80",
-                "https://images.unsplash.com/photo-1555774698-0b77e0d5fac6?auto=format&fit=crop&w=400&q=80",
-              ]}
+              thumbnails={
+                project.mockup?.storage_path ? [project.mockup.storage_path] : []
+              }
             />
           ))}
         </div>
@@ -197,12 +244,13 @@ export default async function ShowcasePage({
                   .split("\n")
                   .map((l) => l.trim())
                   .filter(Boolean)
-              : ["Previously built developer tools, WebSockets, and real-time distributed systems."]
+              : []
           }
           archivedProjects={archivedProjects.map((p) => ({
             id: p.id,
             name: p.name,
-            year: "2025",
+            year: projectYear(p.last_push_at || p.created_at),
+            href: `/${profile.slug}/${p.showcase_slug}`,
           }))}
         />
       </div>

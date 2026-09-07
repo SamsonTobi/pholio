@@ -39,28 +39,13 @@ interface ApiKeyItem {
   created_at: string;
 }
 
-const INITIAL_KEYS: ApiKeyItem[] = [
-  {
-    id: "k-cursor-demo",
-    name: "Cursor IDE agent",
-    prefix: "pholio_live_9c2b4a1e",
-    scopes: ["showcase:write"],
-    revoked_at: null,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-  },
-  {
-    id: "k-claude-demo",
-    name: "Claude Desktop agent",
-    prefix: "pholio_live_7d8e2f01",
-    scopes: ["showcase:write"],
-    revoked_at: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-  },
-];
-
 export default function ApiKeysPage() {
-  const [keys, setKeys] = useState<ApiKeyItem[]>(INITIAL_KEYS);
-  const [loading, setLoading] = useState(false);
+  const [keys, setKeys] = useState<ApiKeyItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   // Generate Key Modal State
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
@@ -85,13 +70,17 @@ export default function ApiKeysPage() {
   const fetchKeys = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const res = await fetch("/api/api-keys");
-      if (res.ok) {
-        const data = await res.json();
-        setKeys(data.keys || []);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to load API keys.");
       }
-    } catch {
-      // Fallback already handled on server
+      const data = await res.json();
+      setKeys(data.keys || []);
+    } catch (err) {
+      setKeys([]);
+      setLoadError(err instanceof Error ? err.message : "Failed to load API keys.");
     } finally {
       setLoading(false);
     }
@@ -103,30 +92,39 @@ export default function ApiKeysPage() {
 
     try {
       setIsGenerating(true);
+      setGenerateError(null);
+      setActionError(null);
       const name = keyName.trim() || "Cursor IDE agent";
       const res = await fetch("/api/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, scopes: ["showcase:write"] }),
+        body: JSON.stringify({ name, scopes: ["showcase:write", "stats:read", "leaderboard:read"] }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const newKey: ApiKeyItem = data.key || {
-          id: data.id,
-          name: data.name,
-          prefix: data.prefix,
-          scopes: data.scopes || ["showcase:write"],
-          created_at: data.created_at || new Date().toISOString(),
-          revoked_at: null,
-        };
-        setKeys((prev) => [newKey, ...prev]);
-        setRevealedToken(data.token);
-        setIsGenerateOpen(false);
-        setKeyName("");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to generate API key.");
       }
-    } catch {
-      // Error handling
+      const data = await res.json();
+      if (!data.token) {
+        throw new Error(
+          "Key may have been created but the secret was not returned. Revoke any duplicate and recreate."
+        );
+      }
+      const newKey: ApiKeyItem = data.key || {
+        id: data.id,
+        name: data.name,
+        prefix: data.prefix,
+        scopes: data.scopes || ["showcase:write"],
+        created_at: data.created_at || new Date().toISOString(),
+        revoked_at: null,
+      };
+      setKeys((prev) => [newKey, ...prev]);
+      setRevealedToken(data.token);
+      setIsGenerateOpen(false);
+      setKeyName("");
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : "Failed to generate API key.");
     } finally {
       setIsGenerating(false);
     }
@@ -137,19 +135,22 @@ export default function ApiKeysPage() {
 
     try {
       setRevokingId(id);
+      setActionError(null);
       const res = await fetch(`/api/api-keys?id=${id}`, {
         method: "DELETE",
       });
 
-      if (res.ok) {
-        setKeys((prev) =>
-          prev.map((k) =>
-            k.id === id ? { ...k, revoked_at: new Date().toISOString() } : k
-          )
-        );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to revoke API key.");
       }
-    } catch {
-      // Error handling
+      setKeys((prev) =>
+        prev.map((k) =>
+          k.id === id ? { ...k, revoked_at: new Date().toISOString() } : k
+        )
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to revoke API key.");
     } finally {
       setRevokingId(null);
     }
@@ -157,6 +158,7 @@ export default function ApiKeysPage() {
 
   const copyToClipboard = async (text: string, isToken: boolean = false) => {
     try {
+      setCopyError(null);
       await navigator.clipboard.writeText(text);
       if (isToken) {
         setCopiedToken(true);
@@ -166,7 +168,7 @@ export default function ApiKeysPage() {
         setTimeout(() => setCopiedSnippet(false), 2000);
       }
     } catch {
-      // Clipboard write fallback
+      setCopyError("Copy failed. Select the text manually to copy.");
     }
   };
 
@@ -247,6 +249,15 @@ export default function ApiKeysPage() {
         </div>
       </div>
 
+      {(loadError || actionError || copyError) && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+        >
+          {loadError || actionError || copyError}
+        </div>
+      )}
+
       {/* Generated Token Dialog */}
       <Dialog open={!!revealedToken} onOpenChange={(open) => !open && setRevealedToken(null)}>
         <DialogContent className="sm:max-w-xl">
@@ -297,6 +308,11 @@ export default function ApiKeysPage() {
                 )}
               </Button>
             </div>
+            {copyError && (
+              <div role="alert" className="text-xs text-red-600 dark:text-red-400">
+                {copyError}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -321,6 +337,14 @@ export default function ApiKeysPage() {
           </DialogHeader>
 
           <form onSubmit={handleGenerate} className="space-y-4">
+            {generateError && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+              >
+                {generateError}
+              </div>
+            )}
             <div className="space-y-2">
               <label
                 htmlFor="key-name"
@@ -337,7 +361,7 @@ export default function ApiKeysPage() {
                 required
               />
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                Default scope: <code className="font-mono text-neutral-700 dark:text-neutral-300">showcase:write</code> (update projects, publish showcases, sync READMEs)
+                Default scopes: <code className="font-mono text-neutral-700 dark:text-neutral-300">showcase:write, stats:read, leaderboard:read</code> (update projects, publish showcases, sync READMEs, read stats and leaderboards)
               </p>
             </div>
 
@@ -388,7 +412,7 @@ export default function ApiKeysPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table aria-label="Agent API keys" className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-neutral-200 bg-neutral-50/75 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-400">
                     <th className="py-3 px-4 font-medium">Name</th>

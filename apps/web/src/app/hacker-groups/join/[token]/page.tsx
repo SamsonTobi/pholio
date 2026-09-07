@@ -53,15 +53,10 @@ export default function JoinHackerGroupPage() {
             setError(data.error || "This invite link is invalid or has expired.");
           }
         }
-      } catch (err: any) {
+      } catch {
         if (!ignore) {
-          // In local demo mode, create fallback
-          setInviteData({
-            valid: true,
-            group_name: "Lagos Hackers",
-            group_slug: "lagos-hackers",
-            visibility: "public",
-          });
+          setInviteData({ valid: false });
+          setError("Couldn't validate this invite. Check your connection and try again.");
         }
       } finally {
         if (!ignore) setLoading(false);
@@ -92,7 +87,10 @@ export default function JoinHackerGroupPage() {
         throw new Error(data.error || "Failed to join hacker group");
       }
 
-      const targetSlug = data.groupSlug || inviteData?.group_slug || "lagos-hackers";
+      const targetSlug = data.groupSlug || inviteData?.group_slug;
+      if (!targetSlug) {
+        throw new Error("Joined, but the group link was missing. Go to Hacker Groups to continue.");
+      }
       router.push(`/hacker-groups/${targetSlug}`);
     } catch (err: any) {
       setError(err.message || "Something went wrong while joining");
@@ -222,7 +220,7 @@ export default function JoinHackerGroupPage() {
           </div>
 
           {error && (
-            <div className="rounded-lg bg-neutral-100 p-3 text-xs font-medium text-neutral-900 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:border-neutral-800 text-center">
+            <div role="alert" className="rounded-lg bg-neutral-100 p-3 text-xs font-medium text-neutral-900 border border-neutral-200 dark:bg-neutral-900 dark:text-neutral-100 dark:border-neutral-800 text-center">
               {error}
             </div>
           )}
