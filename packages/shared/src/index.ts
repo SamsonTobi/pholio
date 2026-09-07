@@ -36,6 +36,17 @@ export const showcaseSchema = z.object({
 
 export type Showcase = z.infer<typeof showcaseSchema>;
 
+// Mockup Schema
+export const mockupSchema = z.object({
+  id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  storage_path: z.string(),
+  device: z.enum(["browser", "phone", "tablet"]),
+  sort: z.number().int().default(0),
+});
+
+export type Mockup = z.infer<typeof mockupSchema>;
+
 // MCP Schemas
 export const mcpSchemas = {
   updateProject: z.object({

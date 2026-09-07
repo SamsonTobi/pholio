@@ -21,6 +21,7 @@ export type Database = {
           site_url: string | null;
           template: "story" | "index";
           slug_history: string[];
+          bio_previously: string | null;
           created_at: string;
         };
         Insert: {
@@ -34,6 +35,7 @@ export type Database = {
           site_url?: string | null;
           template?: "story" | "index";
           slug_history?: string[];
+          bio_previously?: string | null;
           created_at?: string;
         };
         Update: {
@@ -47,6 +49,7 @@ export type Database = {
           site_url?: string | null;
           template?: "story" | "index";
           slug_history?: string[];
+          bio_previously?: string | null;
           created_at?: string;
         };
         Relationships: [];

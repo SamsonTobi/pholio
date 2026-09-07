@@ -17,6 +17,7 @@ const DEMO_PROFILES: Record<string, Profile> = {
     site_url: "https://samsontobi.dev",
     template: "story",
     slug_history: ["samsontobi"],
+    bio_previously: "Co-founded Paystack mobile, earlier at Konga engineering.",
     created_at: new Date().toISOString(),
   },
   siddharth: {
@@ -30,6 +31,7 @@ const DEMO_PROFILES: Record<string, Profile> = {
     site_url: "https://siddharth.me",
     template: "index",
     slug_history: [],
+    bio_previously: "Design engineer at Linear, previously built interfaces at Stripe.",
     created_at: new Date().toISOString(),
   },
 };

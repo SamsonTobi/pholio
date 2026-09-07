@@ -5,6 +5,7 @@ export const profileUpdateSchema = z.object({
   headline: z.string().max(100).optional(),
   site_url: z.string().url().or(z.literal("")).optional(),
   template: z.enum(["story", "index"]).optional(),
+  bio_previously: z.string().max(1000).optional().nullable(),
 });
 
 export const changeSlugSchema = z.object({

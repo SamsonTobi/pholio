@@ -105,3 +105,60 @@ export async function getProjectBySlug(
   const projects = await listProjectsByOwner(ownerId);
   return projects.find((p) => p.showcase_slug === projectSlug) || null;
 }
+
+export async function getProjectById(
+  id: string,
+  ownerId: string = "00000000-0000-0000-0000-000000000001"
+): Promise<EnrichedProject | null> {
+  try {
+    const supabase = await createClient();
+    const { data } = (await (supabase.from("projects") as any)
+      .select("*")
+      .eq("id", id)
+      .single()) as { data: Project | null };
+
+    if (data) {
+      return {
+        ...data,
+        mockup: null,
+        latestShowcases: [],
+      };
+    }
+  } catch {
+    // Database fallback
+  }
+
+  const projects = await listProjectsByOwner(ownerId);
+  return projects.find((p) => p.id === id) || null;
+}
+
+export async function updateProject(
+  id: string,
+  updates: Partial<Project>
+): Promise<Project | null> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = (await (supabase.from("projects") as any)
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single()) as { data: Project | null; error: { message: string } | null };
+
+    if (error) throw new Error(error.message);
+    if (data) return data;
+  } catch {
+    // Database fallback
+  }
+
+  const demoProject = (await listProjectsByOwner("00000000-0000-0000-0000-000000000001")).find(
+    (p) => p.id === id
+  );
+
+  if (demoProject) {
+    Object.assign(demoProject, updates);
+    return demoProject;
+  }
+
+  return null;
+}
+

@@ -5,7 +5,7 @@ export const importSchema = z.object({
 });
 
 export const resyncSchema = z.object({
-  project_id: z.string().uuid(),
+  project_id: z.string().min(1),
 });
 
 export type ImportInput = z.infer<typeof importSchema>;
