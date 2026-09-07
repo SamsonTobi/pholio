@@ -1,6 +1,35 @@
 import { z } from "zod";
 
 const isProd = process.env.NODE_ENV === "production";
+const isBrowser = typeof window !== "undefined";
+
+function normalizeUrl(raw: string | undefined): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  // Tolerate bare domains pasted without a scheme (e.g. "pholio.cc").
+  if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(value)) {
+    return `https://${value}`;
+  }
+  return value;
+}
+
+function ensureValidUrl(value: string | undefined, fallback: string): string {
+  if (!value) return fallback;
+  try {
+    new URL(value);
+    return value;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeHostname(url: string, fallback: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return fallback;
+  }
+}
 
 const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
@@ -24,10 +53,10 @@ const envSchema = z.object({
   CRON_SECRET: z.string().optional(),
 });
 
-function parseEnv() {
-  const parsed = envSchema.safeParse({
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    NEXT_PUBLIC_TRACKER_URL: process.env.NEXT_PUBLIC_TRACKER_URL,
+function readRawEnv() {
+  return {
+    NEXT_PUBLIC_APP_URL: normalizeUrl(process.env.NEXT_PUBLIC_APP_URL),
+    NEXT_PUBLIC_TRACKER_URL: normalizeUrl(process.env.NEXT_PUBLIC_TRACKER_URL),
     NEXT_PUBLIC_REALTIME_URL: process.env.NEXT_PUBLIC_REALTIME_URL,
     REALTIME_FANOUT_SECRET: process.env.REALTIME_FANOUT_SECRET,
     SUPABASE_URL: process.env.SUPABASE_URL,
@@ -45,18 +74,36 @@ function parseEnv() {
     GITHUB_WEBHOOK_SECRET: process.env.GITHUB_WEBHOOK_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     RESEND_FROM: process.env.RESEND_FROM,
-    PHOLIO_BASE_URL: process.env.PHOLIO_BASE_URL,
+    PHOLIO_BASE_URL: normalizeUrl(process.env.PHOLIO_BASE_URL),
     CRON_SECRET: process.env.CRON_SECRET,
-  });
+  };
+}
+
+function browserFallback() {
+  // The browser bundle never carries server-only vars and must never crash
+  // the page: return best-effort values, validated strictly server-side.
+  const defaults = envSchema.parse({});
+  const raw = readRawEnv();
+  const defined = Object.fromEntries(
+    Object.entries(raw).filter(([, value]) => value !== undefined)
+  );
+  return { ...defaults, ...defined };
+}
+
+function parseEnv() {
+  const parsed = envSchema.safeParse(readRawEnv());
 
   if (!parsed.success) {
+    if (isBrowser) return browserFallback();
     console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors);
     throw new Error("Invalid environment variables");
   }
 
   const data = parsed.data;
 
-  if (isProd) {
+  // Fail fast on the server only. The browser bundle (non-NEXT_PUBLIC_ vars
+  // stripped) must never throw or every page becomes a client exception.
+  if (isProd && !isBrowser) {
     const missing: string[] = [];
     const isPlaceholder = (v?: string) =>
       !v || v.includes("placeholder") || v.includes("localhost") || v.length < 16;
@@ -79,9 +126,17 @@ function parseEnv() {
 
 export const env = parseEnv();
 
-export const APP_URL = env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
-export const BASE_URL = (env.PHOLIO_BASE_URL ?? env.NEXT_PUBLIC_APP_URL).replace(/\/+$/, "");
-export const RESEND_FROM = env.RESEND_FROM ?? `notifications@${new URL(APP_URL).hostname}`;
+const FALLBACK_APP_URL = "http://localhost:3000";
+
+export const APP_URL = ensureValidUrl(env.NEXT_PUBLIC_APP_URL, FALLBACK_APP_URL).replace(
+  /\/+$/,
+  ""
+);
+export const BASE_URL = ensureValidUrl(
+  env.PHOLIO_BASE_URL ?? env.NEXT_PUBLIC_APP_URL,
+  FALLBACK_APP_URL
+).replace(/\/+$/, "");
+export const RESEND_FROM = env.RESEND_FROM ?? `notifications@${safeHostname(APP_URL, "localhost")}`;
 export const SUPABASE_JWKS_URL = env.SUPABASE_JWKS_URL;
 export const SUPABASE_AUTH_CALLBACK_URL = env.SUPABASE_AUTH_CALLBACK_URL;
 export const TRACKER_URL = env.NEXT_PUBLIC_TRACKER_URL;
