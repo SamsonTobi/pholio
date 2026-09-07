@@ -1,38 +1,88 @@
 import { describe, it, expect } from "vitest";
+import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-describe("Database RLS Matrix & Access Controls", () => {
-  it("verifies anonymous users cannot write to projects, showcases, or mockups", () => {
-    // Verified by RLS policies:
-    // - public.projects: Owners can insert with check (auth.uid() = owner_id)
-    // - public.showcases: Owners can insert with check (auth.uid() = owner_id)
-    // - public.mockups: Project owners can insert mockups via projects join check
-    const anonCanWrite = false;
-    expect(anonCanWrite).toBe(false);
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const LIVE =
+  SUPABASE_URL &&
+  ANON_KEY &&
+  !SUPABASE_URL.includes("placeholder") &&
+  !ANON_KEY.includes("placeholder");
+
+const describeLive = LIVE ? describe : describe.skip;
+
+function migrationSql(file: string): string {
+  const dir = dirname(fileURLToPath(import.meta.url));
+  return readFileSync(join(dir, "..", "..", "..", "..", "..", "supabase", "migrations", file), "utf8");
+}
+
+/**
+ * Live RLS integration tests. Require a real Supabase project
+ * (NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY); skipped in
+ * offline CI. The static suite below always runs and pins the migration
+ * files that implement each guarantee, so silent policy removal fails the
+ * build even without a database.
+ */
+describeLive("Database RLS Matrix (live Supabase)", () => {
+  it("anonymous users cannot insert into projects/showcases/mockups", async () => {
+    const anon = createClient(SUPABASE_URL, ANON_KEY);
+    const { error } = await (anon.from("projects") as any).insert({
+      owner_id: "00000000-0000-0000-0000-000000000001",
+      name: "rls-probe",
+      showcase_slug: "rls-probe",
+      telemetry_slug: `rls-probe-${Date.now()}`,
+    });
+    expect(error).not.toBeNull();
   });
 
-  it("verifies public groups and showcases are readable by everyone", () => {
-    // Verified by RLS:
-    // - public.showcases: "Public showcases are readable" using (true)
-    // - public.hacker_groups: visibility = 'public' or auth.uid() = created_by or member
-    const publicAccessible = true;
-    expect(publicAccessible).toBe(true);
+  it("anonymous users cannot read private invites or outbox rows", async () => {
+    const anon = createClient(SUPABASE_URL, ANON_KEY);
+    const { data: invites } = await (anon.from("hacker_group_invites") as any)
+      .select("token")
+      .limit(1);
+    expect(invites ?? []).toEqual([]);
+    const { data: outbox } = await (anon.from("realtime_outbox") as any)
+      .select("id")
+      .limit(1);
+    expect(outbox ?? []).toEqual([]);
   });
 
-  it("verifies private groups restrict access to members and owners only", () => {
-    const isMember = false;
-    const isOwner = false;
-    const isPrivate = true;
+  it("public showcases and public groups are readable anonymously", async () => {
+    const anon = createClient(SUPABASE_URL, ANON_KEY);
+    const { error: sErr } = await (anon.from("showcases") as any).select("id").limit(1);
+    expect(sErr).toBeNull();
+    const { error: gErr } = await (anon.from("hacker_groups") as any)
+      .select("id")
+      .eq("visibility", "public")
+      .limit(1);
+    expect(gErr).toBeNull();
+  });
+});
 
-    const canAccess = !isPrivate || isMember || isOwner;
-    expect(canAccess).toBe(false);
+describe("Database RLS Matrix (static policy pins)", () => {
+  it("032 removes the world-readable invite policy and member self-insert", () => {
+    const sql032 = migrationSql("032_security_cron_fixes.sql");
+    expect(sql032).toMatch(/drop policy if exists/i);
+    expect(sql032).toMatch(/realtime_outbox/);
+    expect(sql032).toMatch(/service_role/);
   });
 
-  it("verifies service_role access for system-level inserts (notifications, raw_events, snapshots)", () => {
-    // Verified by RLS:
-    // - public.notifications: "Service role writes notifications" with check (auth.role() = 'service_role')
-    // - public.raw_events: "Service role manages raw events" with check (auth.role() = 'service_role')
-    // - public.leaderboard_snapshots: "Service role writes snapshots" with check (auth.role() = 'service_role')
-    const serviceRoleOnly = true;
-    expect(serviceRoleOnly).toBe(true);
+  it("033 adds the webhook delivery-idempotency column", () => {
+    const sql033 = migrationSql("033_webhook_delivery_id.sql");
+    expect(sql033).toMatch(/delivery_id/);
+  });
+
+  it("034 guards fanout triggers and stamps payload ids", () => {
+    const sql034 = migrationSql("034_fanout_contract_guards.sql");
+    expect(sql034).toMatch(/is distinct from new/);
+    expect(sql034).toMatch(/'id', NEW\.(project_id|group_id)::text/);
+  });
+
+  it("service-only tables expose no anon insert path", () => {
+    const sql018 = migrationSql("018_telemetry_rls.sql");
+    expect(sql018).toMatch(/service_role/);
   });
 });

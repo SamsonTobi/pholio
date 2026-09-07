@@ -10,10 +10,24 @@ export interface RealtimeMessage {
   [key: string]: unknown;
 }
 
+function toWebSocketUrl(base: string): string | null {
+  const trimmed = (base || "").trim().replace(/\/+$/, "");
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol === "https:") url.protocol = "wss:";
+    else if (url.protocol === "http:") url.protocol = "ws:";
+    else if (url.protocol !== "wss:" && url.protocol !== "ws:") return null;
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
 /**
  * useRealtimeChannel connects to the Cloudflare Worker Durable Object WebSocket
- * for instant live updates. If the connection fails, it falls back silently to
- * background polling (refetchInterval: 60_000) ensuring period-based, fault-tolerant updates.
+ * for instant live updates. If the connection fails, callers should rely on
+ * targeted per-query polling/refetch instead of a global interval.
  */
 export function useRealtimeChannel(
   channel: string | null | undefined,
@@ -25,6 +39,16 @@ export function useRealtimeChannel(
   useEffect(() => {
     if (!channel || typeof window === "undefined") return;
 
+    const baseUrl = toWebSocketUrl(REALTIME_URL);
+    if (!baseUrl) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[realtime] NEXT_PUBLIC_REALTIME_URL is not set or invalid; skipping WebSocket connect."
+        );
+      }
+      return;
+    }
+
     let ws: WebSocket | null = null;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
@@ -35,7 +59,7 @@ export function useRealtimeChannel(
       if (!isMounted) return;
 
       try {
-        const wsUrl = `${REALTIME_URL.replace(/^http/, "ws")}/subscribe?channel=${encodeURIComponent(
+        const wsUrl = `${baseUrl}/subscribe?channel=${encodeURIComponent(
           channel!
         )}`;
         ws = new WebSocket(wsUrl);

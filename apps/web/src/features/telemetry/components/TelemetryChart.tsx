@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Users, Activity, BarChart3, AlertCircle } from "lucide-react";
+import { useRealtimeChannel } from "@/lib/realtime-client";
 
 export interface DayStat {
   day: string;
@@ -46,6 +47,12 @@ export function TelemetryChart({
   const [hoveredDay, setHoveredDay] = useState<DayStat | null>(null);
 
   const effectiveSlug = projectSlug || telemetrySlug || "";
+  const queryClient = useQueryClient();
+
+  // Targeted realtime invalidation; per-chart refetchInterval below stays as fallback.
+  useRealtimeChannel(effectiveSlug ? `showcase:${effectiveSlug}` : null, () => {
+    queryClient.invalidateQueries({ queryKey: ["telemetry-stats", effectiveSlug] });
+  });
 
   const { data, isLoading, isError, error } = useQuery<StatsResponse>({
     queryKey: ["telemetry-stats", effectiveSlug, 7],

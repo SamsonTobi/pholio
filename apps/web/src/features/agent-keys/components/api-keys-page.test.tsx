@@ -13,18 +13,19 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Agent API Keys UI Pages", () => {
-  it("renders Agent API Keys dashboard page with header, button, table headers, and instructions", () => {
+  it("renders Agent API Keys dashboard page with honest loading/empty state and no demo keys", () => {
     const html = renderToString(<ApiKeysPage />);
     expect(html).toContain("Agent API Keys");
     expect(html).toContain(
       "Generate API keys to empower AI coding agents (Claude, Cursor, Copilot, Antigravity) to update your showcase automatically via MCP."
     );
     expect(html).toContain("Generate API Key");
-    expect(html).toContain("Name");
-    expect(html).toContain("Prefix");
-    expect(html).toContain("Scopes");
-    expect(html).toContain("Created Date");
-    expect(html).toContain("Status");
+    // No hardcoded demo keys
+    expect(html).not.toContain("Cursor IDE agent");
+    expect(html).not.toContain("Claude Desktop agent");
+    expect(html).not.toContain("pholio_live_9c2b4a1e");
+    // Honest initial state: loading or empty, plus instructions
+    expect(html).toMatch(/Loading API keys|No API keys generated yet/);
     expect(html).toContain("Quick Configuration Instructions");
     expect(html).toContain("Cursor (.cursor/mcp.json)");
     expect(html).toContain("Claude Desktop (claude_desktop_config.json)");

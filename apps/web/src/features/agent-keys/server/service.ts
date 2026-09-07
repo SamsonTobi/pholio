@@ -31,6 +31,23 @@ export interface GeneratedApiKey {
   key: ApiKeyItem & { user_id: string };
 }
 
+export const ALLOWED_SCOPES = ["showcase:write", "stats:read", "leaderboard:read"] as const;
+export type AllowedScope = (typeof ALLOWED_SCOPES)[number];
+
+/** Default scopes for new keys: full access (write implies read). */
+export const DEFAULT_SCOPES: string[] = [...ALLOWED_SCOPES];
+
+function normalizeScopes(scopes?: string[]): string[] {
+  if (!scopes || scopes.length === 0) return [...DEFAULT_SCOPES];
+  const filtered = scopes.filter((s): s is string =>
+    (ALLOWED_SCOPES as readonly string[]).includes(s)
+  );
+  if (filtered.length === 0) {
+    throw new Error(`Invalid scopes. Allowed: ${ALLOWED_SCOPES.join(", ")}`);
+  }
+  return Array.from(new Set(filtered));
+}
+
 // In-memory fallback store when Supabase credentials are not configured or offline
 const inMemoryApiKeys = new Map<string, StoredApiKey>();
 
@@ -104,8 +121,9 @@ export const constantTimeCompare = timingSafeEqualCompare;
 export async function generateApiKey({
   userId,
   name,
-  scopes = ["showcase:write"],
+  scopes = [...DEFAULT_SCOPES],
 }: GenerateApiKeyParams): Promise<GeneratedApiKey> {
+  const normalizedScopes = normalizeScopes(scopes);
   const hexPrefix = randomHex(8);
   const hexSecret = randomHex(32);
   const prefix = `pholio_live_${hexPrefix}`;
@@ -128,7 +146,7 @@ export async function generateApiKey({
           name: keyName,
           prefix,
           key_hash: keyHash,
-          scopes,
+          scopes: normalizedScopes,
         })
         .select()
         .single();
@@ -148,7 +166,7 @@ export async function generateApiKey({
     name: keyName,
     prefix,
     key_hash: keyHash,
-    scopes,
+    scopes: normalizedScopes,
     created_at: insertedCreatedAt,
     revoked_at: null,
   };
@@ -160,7 +178,7 @@ export async function generateApiKey({
     token,
     prefix,
     name: keyName,
-    scopes,
+    scopes: normalizedScopes,
     key: storedKey,
   };
 }
@@ -253,7 +271,7 @@ export async function revokeApiKey({
  */
 export async function verifyApiKey(
   token: string
-): Promise<{ userId: string; scopes: string[] } | null> {
+): Promise<{ userId: string; scopes: string[]; prefix: string } | null> {
   if (!token || typeof token !== "string") {
     return null;
   }
@@ -281,6 +299,7 @@ export async function verifyApiKey(
           return {
             userId: data.user_id,
             scopes: data.scopes || ["showcase:write"],
+            prefix,
           };
         }
         return null;
@@ -299,6 +318,7 @@ export async function verifyApiKey(
       return {
         userId: inMemory.user_id,
         scopes: inMemory.scopes || ["showcase:write"],
+        prefix,
       };
     }
     return null;

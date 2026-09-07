@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 export const ingestSchema = z.object({
-  telemetry_slug: z.string().min(3).max(64),
+  telemetry_slug: z
+    .string()
+    .min(3)
+    .max(64)
+    .regex(/^[a-z0-9-]+$/, "telemetry_slug must be lowercase alphanumeric with dashes"),
   session_hash: z.string().min(3).max(128),
   path: z.string().max(500).optional().default("/"),
 });

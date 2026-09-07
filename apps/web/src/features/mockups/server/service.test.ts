@@ -3,11 +3,24 @@ import { validateMockupFile, sortMockups } from "./service";
 
 describe("Mockups feature", () => {
   describe("File validation", () => {
-    it("accepts valid png, jpeg, webp, and svg under 5MB", () => {
+    it("accepts valid png, jpeg, and webp under 5MB", () => {
       expect(validateMockupFile("image/png", 1024 * 1024)).toBe(true);
       expect(validateMockupFile("image/jpeg", 2 * 1024 * 1024)).toBe(true);
       expect(validateMockupFile("image/webp", 3 * 1024 * 1024)).toBe(true);
-      expect(validateMockupFile("image/svg+xml", 500 * 1024)).toBe(true);
+    });
+
+    it("rejects svg (disallowed: png/jpeg/webp only)", () => {
+      expect(() =>
+        validateMockupFile("image/svg+xml", 500 * 1024)
+      ).toThrow("Unsupported file type");
+    });
+
+    it("rejects content that does not match declared mime type", () => {
+      const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      expect(() => validateMockupFile("image/jpeg", pngBytes.length, pngBytes)).toThrow(
+        "does not match"
+      );
+      expect(validateMockupFile("image/png", pngBytes.length, pngBytes)).toBe(true);
     });
 
     it("rejects files exceeding 5MB limit", () => {

@@ -1,5 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 import { Database } from "@/lib/supabase/types";
+
+const LIVE = () =>
+  Boolean(
+    env.NEXT_PUBLIC_SUPABASE_URL &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
+      !env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") &&
+      !env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
+  );
 
 export type Showcase = Database["public"]["Tables"]["showcases"]["Row"];
 export type ShowcaseSource = "github" | "agent" | "manual";
@@ -36,6 +45,15 @@ export function resolveShowcaseMeta(
   }
   return result;
 }
+
+/** Rethrow live-backend failures instead of serving demo rows in production. */
+function rethrowIfLive(err: unknown): void {
+  if (LIVE()) {
+    throw err instanceof Error ? err : new Error("Service unavailable");
+  }
+}
+
+const isProd = () => process.env.NODE_ENV === "production" || LIVE();
 
 let DEMO_SHOWCASES: Showcase[] = [
   {
@@ -108,52 +126,91 @@ export async function publishShowcase(
 
   const resolvedMeta = resolveShowcaseMeta(meta, isPinned ? true : undefined);
 
-  try {
-    const supabase = await createClient();
-
-    if (isPinned) {
-      // Unpin existing showcases for this owner
-      const { data: existingPinned } = await (supabase.from("showcases") as any)
-        .select("id, meta")
-        .eq("owner_id", ownerId)
-        .contains("meta", { pinned: true });
-
-      if (existingPinned && existingPinned.length > 0) {
-        await Promise.all(
-          existingPinned.map((s: { id: string; meta: Record<string, unknown> }) =>
-            (supabase.from("showcases") as any)
-              .update({
-                meta: { ...(s.meta || {}), pinned: false },
-              })
-              .eq("id", s.id)
-          )
-        );
-      }
-    }
-
-    const { data, error } = await (supabase.from("showcases") as any)
-      .insert({
-        project_id: projectId,
-        owner_id: ownerId,
-        body,
-        source,
-        meta: resolvedMeta,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (data) {
-      return data as Showcase;
-    }
-  } catch (err: any) {
-    // Database connection fallback
+  // Offline demo path first: never touch the network without a linked backend
+  // (admin queries stall for seconds against an unreachable host).
+  if (!LIVE()) {
+    return publishDemoShowcase({ ownerId, projectId, body, source, isPinned, resolvedMeta });
   }
 
-  // Demo fallback
+  // Live path. Ownership is verified in code with an explicit owner_id scope;
+  // the admin client also serves cookieless MCP callers. RLS remains as a
+  // second layer for direct table access.
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const supabase = createAdminClient();
+
+  const { data: project, error: projectError } = (await (supabase
+    .from("projects") as any)
+    .select("id")
+    .eq("id", projectId)
+    .eq("owner_id", ownerId)
+    .maybeSingle()) as { data: { id: string } | null; error: unknown };
+
+  if (projectError || !project) {
+    const { data: exists } = (await (supabase.from("projects") as any)
+      .select("id")
+      .eq("id", projectId)
+      .maybeSingle()) as { data: { id: string } | null };
+    throw new Error(exists ? "Forbidden" : "Project not found");
+  }
+
+  if (isPinned) {
+    // Unpin existing showcases for this owner
+    const { data: existingPinned } = await (supabase.from("showcases") as any)
+      .select("id, meta")
+      .eq("owner_id", ownerId)
+      .contains("meta", { pinned: true });
+
+    if (existingPinned && existingPinned.length > 0) {
+      await Promise.all(
+        existingPinned.map((s: { id: string; meta: Record<string, unknown> }) =>
+          (supabase.from("showcases") as any)
+            .update({
+              meta: { ...(s.meta || {}), pinned: false },
+            })
+            .eq("id", s.id)
+        )
+      );
+    }
+  }
+
+  const { data, error } = await (supabase.from("showcases") as any)
+    .insert({
+      project_id: projectId,
+      owner_id: ownerId,
+      body,
+      source,
+      meta: resolvedMeta,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (data) {
+    return data as Showcase;
+  }
+  throw new Error("Publish failed");
+}
+
+function publishDemoShowcase({
+  ownerId,
+  projectId,
+  body,
+  source,
+  isPinned,
+  resolvedMeta,
+}: {
+  ownerId: string;
+  projectId: string;
+  body: string;
+  source: ShowcaseSource;
+  isPinned: boolean | undefined;
+  resolvedMeta: Record<string, unknown>;
+}): Showcase {
+  // Offline demo fallback (no linked backend only — never in production,
+  // which always takes the live path above).
   if (isPinned) {
     DEMO_SHOWCASES = DEMO_SHOWCASES.map((s) => {
       if (s.owner_id === ownerId) {
@@ -226,9 +283,14 @@ export async function updateShowcase({
     if (err?.message?.includes("Unauthorized")) {
       throw err;
     }
-    // Database fallback
+    rethrowIfLive(err);
   }
 
+  if (isProd()) {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
   const demo = DEMO_SHOWCASES.find((s) => s.id === id);
   if (demo) {
     if (demo.owner_id !== ownerId) {
@@ -272,9 +334,14 @@ export async function togglePinShowcase(
     if (err?.message?.includes("Unauthorized")) {
       throw err;
     }
-    // Database fallback
+    rethrowIfLive(err);
   }
 
+  if (isProd()) {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
   const demo = DEMO_SHOWCASES.find((s) => s.id === id);
   if (demo) {
     if (demo.owner_id !== ownerId) {
@@ -322,9 +389,14 @@ export async function removeShowcase({
     if (err?.message?.includes("Unauthorized")) {
       throw err;
     }
-    // Fallback
+    rethrowIfLive(err);
   }
 
+  if (isProd()) {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
   const idx = DEMO_SHOWCASES.findIndex((s) => s.id === id);
   if (idx !== -1) {
     if (DEMO_SHOWCASES[idx].owner_id !== ownerId) {
@@ -349,13 +421,15 @@ export async function listShowcasesByProject(projectId: string): Promise<Showcas
       throw new Error(error.message);
     }
 
-    if (data && data.length > 0) {
-      return data as Showcase[];
-    }
-  } catch {
-    // Database fallback
+    // Authoritative answer (possibly empty) — never fabricate rows.
+    return (data || []) as Showcase[];
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
+  if (isProd()) return [];
+
+  // Offline demo fallback (dev/test only)
   return DEMO_SHOWCASES.filter((s) => s.project_id === projectId).sort(
     (a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
   );
@@ -373,13 +447,15 @@ export async function listShowcasesByOwner(ownerId: string): Promise<Showcase[]>
       throw new Error(error.message);
     }
 
-    if (data && data.length > 0) {
-      return data as Showcase[];
-    }
-  } catch {
-    // Database fallback
+    // Authoritative answer (possibly empty) — never fabricate rows.
+    return (data || []) as Showcase[];
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
+  if (isProd()) return [];
+
+  // Offline demo fallback (dev/test only)
   return DEMO_SHOWCASES.filter((s) => s.owner_id === ownerId).sort(
     (a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
   );
@@ -413,10 +489,14 @@ export async function getLatestPinnedShowcase(ownerId: string): Promise<Showcase
     if (latest) {
       return latest as Showcase;
     }
-  } catch {
-    // Fallback
+    return null;
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
+  if (isProd()) return null;
+
+  // Offline demo fallback (dev/test only)
   const ownerShowcases = DEMO_SHOWCASES.filter((s) => s.owner_id === ownerId).sort(
     (a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
   );

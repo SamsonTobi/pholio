@@ -1,25 +1,41 @@
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 import { listUserRepos, GitHubRepoItem } from "@/lib/github";
 import { parseReadmeContent } from "./readme";
 import { resolveProjectIcon } from "./icons";
 import { Database } from "@/lib/supabase/types";
+import crypto from "node:crypto";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 function generateTelemetrySlug(name: string): string {
   const clean = name.toLowerCase().replace(/[^a-z0-9]/g, "-").substring(0, 16);
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  const randomSuffix = crypto.randomUUID().replace(/-/g, "").substring(0, 6);
   return `${clean}-${randomSuffix}`;
+}
+
+function isSupabaseLive(): boolean {
+  return Boolean(
+    env.NEXT_PUBLIC_SUPABASE_URL &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
+      !env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") &&
+      !env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
+  );
 }
 
 export async function listImportableRepos(token?: string | null): Promise<GitHubRepoItem[]> {
   const repos = await listUserRepos(token);
-  return repos.sort((a, b) => {
-    const pushA = new Date(a.pushed_at).getTime();
-    const pushB = new Date(b.pushed_at).getTime();
-    if (pushB !== pushA) return pushB - pushA;
-    return b.stargazers_count - a.stargazers_count;
-  });
+  return repos
+    .filter((r) => !r.fork && !r.archived)
+    .sort((a, b) => {
+      const pushA = new Date(a.pushed_at).getTime();
+      const pushB = new Date(b.pushed_at).getTime();
+      if (Number.isNaN(pushA) && Number.isNaN(pushB)) return 0;
+      if (Number.isNaN(pushA)) return 1;
+      if (Number.isNaN(pushB)) return -1;
+      if (pushB !== pushA) return pushB - pushA;
+      return b.stargazers_count - a.stargazers_count;
+    });
 }
 
 export async function importRepos(
@@ -67,21 +83,44 @@ export async function importRepos(
     };
 
     try {
+      // Preserve the existing telemetry_slug on re-import: it is the stable
+      // key for raw_events/daily_stats. Only new projects get a fresh slug.
+      const { data: existing } = await (supabase.from("projects") as any)
+        .select("id, telemetry_slug")
+        .eq("owner_id", userId)
+        .eq("github_repo_id", repo.id)
+        .maybeSingle();
+
       const { data: project } = await (supabase.from("projects") as any)
-        .upsert(projectPayload, { onConflict: "owner_id,github_repo_id" })
+        .upsert(
+          existing?.telemetry_slug
+            ? { ...projectPayload, telemetry_slug: existing.telemetry_slug }
+            : projectPayload,
+          { onConflict: "owner_id,github_repo_id" }
+        )
         .select()
         .single();
 
       if (project) {
         createdProjects.push(project);
 
-        // Create initial showcase draft marked source=github
-        await (supabase.from("showcases") as any).insert({
-          project_id: project.id,
-          owner_id: userId,
-          body: `Initial import of ${project.name} from GitHub. ${project.description || ""}`.trim().substring(0, 600),
-          source: "github",
-        });
+        // Initial showcase draft only on first import (no github-source
+        // showcase yet) — re-imports must not duplicate it.
+        const { data: priorDraft } = await (supabase.from("showcases") as any)
+          .select("id")
+          .eq("project_id", project.id)
+          .eq("source", "github")
+          .limit(1)
+          .maybeSingle();
+
+        if (!priorDraft) {
+          await (supabase.from("showcases") as any).insert({
+            project_id: project.id,
+            owner_id: userId,
+            body: `Initial import of ${project.name} from GitHub. ${project.description || ""}`.trim().substring(0, 600),
+            source: "github",
+          });
+        }
 
         // Insert sync event
         await (supabase.from("github_sync_events") as any).insert({
@@ -91,16 +130,22 @@ export async function importRepos(
           pushed_at: repo.pushed_at,
         });
       }
-    } catch {
-      // Allow preview fallback in dev
+    } catch (err) {
+      // Per-repo failure: surface on live backends, tolerate offline.
+      if (isSupabaseLive()) throw err instanceof Error ? err : new Error("Import failed");
     }
   }
 
   return createdProjects;
 }
 
-export async function reparseProject(projectId: string): Promise<boolean> {
-  const supabase = await createClient();
+export async function reparseProject(projectId: string, userId: string): Promise<boolean> {
+  // Offline fast path: never hit the network without a linked backend.
+  if (!isSupabaseLive()) return true;
+  // Admin client: ownership is verified in code below (this path also serves
+  // cookieless MCP callers). RLS remains for direct table access.
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const supabase = createAdminClient();
   try {
     const { data: project } = await (supabase.from("projects") as any)
       .select("*")
@@ -108,6 +153,10 @@ export async function reparseProject(projectId: string): Promise<boolean> {
       .single();
 
     if (!project) return false;
+
+    if (project.owner_id !== userId) {
+      throw new Error("Forbidden: you do not own this project");
+    }
 
     await (supabase.from("projects") as any)
       .update({
@@ -123,7 +172,10 @@ export async function reparseProject(projectId: string): Promise<boolean> {
     });
 
     return true;
-  } catch {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("Forbidden")) {
+      throw err;
+    }
     return false;
   }
 }

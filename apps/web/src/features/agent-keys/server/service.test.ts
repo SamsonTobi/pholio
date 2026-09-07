@@ -27,7 +27,7 @@ describe("Agent Keys Feature", () => {
         name: "Cursor Agent",
       });
       expect(parsed.name).toBe("Cursor Agent");
-      expect(parsed.scopes).toEqual(["showcase:write"]);
+      expect(parsed.scopes).toEqual(["showcase:write", "stats:read", "leaderboard:read"]);
     });
 
     it("defaults name when not provided", () => {
@@ -104,11 +104,11 @@ describe("Agent Keys Feature", () => {
       expect(result.key.revoked_at).toBeNull();
       expect(result.token.startsWith(result.key.prefix)).toBe(true);
 
-      // Verify the generated token works
+      // Verify the generated token works (defaults to full scopes)
       const auth = await verifyApiKey(result.token);
       expect(auth).not.toBeNull();
       expect(auth?.userId).toBe(testUserId);
-      expect(auth?.scopes).toEqual(["showcase:write"]);
+      expect(auth?.scopes).toEqual(["showcase:write", "stats:read", "leaderboard:read"]);
     });
 
     it("rejects token with modified secret, wrong prefix, or invalid format", async () => {

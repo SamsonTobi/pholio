@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
     push: vi.fn(),
   }),
   useParams: () => ({
-    groupSlug: "lagos-hackers",
+    groupSlug: "design-eng",
     token: "test-token-123",
   }),
 }));
@@ -21,7 +21,6 @@ describe("Hacker Groups UI Pages", () => {
     const html = renderToString(<HackerGroupsDashboardPage />);
     expect(html).toContain("Hacker Groups");
     expect(html).toContain("Create Hacker Group");
-    expect(html).toContain("Lagos Hackers");
   });
 
   it("renders Hacker Group Detail Page with leaderboard", () => {

@@ -246,6 +246,8 @@ describe("Telemetry Feature", () => {
       expect(typeof stats.totals.actives_7d).toBe("number");
       expect(stats.totals.visitors_7d).toBeGreaterThan(0);
       expect(stats.totals.actives_7d).toBeGreaterThan(0);
+      // Offline deterministic fallback must be explicitly marked demo
+      expect(stats.demo).toBe(true);
 
       // Deterministic output: calling again yields identical result
       const statsAgain = await getStats({ projectSlug: "pholio", days: 7 });
@@ -297,9 +299,9 @@ describe("Telemetry Feature", () => {
       expect(failNoHash).toBe(false);
     });
 
-    it("recognizes demo showcases in hasEvents", async () => {
-      expect(await hasEvents("pholio-demo")).toBe(true);
-      expect(await hasEvents("bankroll-demo")).toBe(true);
+    it("no longer fabricates events for unknown slugs in hasEvents", async () => {
+      expect(await hasEvents("pholio-demo")).toBe(false);
+      expect(await hasEvents("bankroll-demo")).toBe(false);
     });
   });
 
@@ -358,7 +360,9 @@ describe("Telemetry Feature", () => {
             },
             body: JSON.stringify({
               telemetry_slug: "rate-limit-slug",
-              session_hash: "hash_123456",
+              // Unique session per request so the IP limiter (not the
+              // per-session throttle) is what binds here.
+              session_hash: `hash_123456_${i}`,
             }),
           });
           const okRes = await ingestPost(req);
@@ -374,7 +378,7 @@ describe("Telemetry Feature", () => {
           },
           body: JSON.stringify({
             telemetry_slug: "rate-limit-slug",
-            session_hash: "hash_123456",
+            session_hash: "hash_123456_final",
           }),
         });
 
@@ -384,6 +388,39 @@ describe("Telemetry Feature", () => {
 
         const data = await res429.json();
         expect(data).toEqual({ error: "Rate limit exceeded" });
+      });
+
+      it("returns 429 when a single session exceeds its own throttle", async () => {
+        const sessionHash = "throttled-session-abc";
+        for (let i = 0; i < 30; i++) {
+          const req = new NextRequest("http://localhost:3000/api/ingest", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-forwarded-for": `203.0.113.${100 + i}`,
+            },
+            body: JSON.stringify({
+              telemetry_slug: "session-throttle-slug",
+              session_hash: sessionHash,
+            }),
+          });
+          const res = await ingestPost(req);
+          expect(res.status).toBe(200);
+        }
+
+        const blocked = new NextRequest("http://localhost:3000/api/ingest", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-forwarded-for": "203.0.113.200",
+          },
+          body: JSON.stringify({
+            telemetry_slug: "session-throttle-slug",
+            session_hash: sessionHash,
+          }),
+        });
+        const resBlocked = await ingestPost(blocked);
+        expect(resBlocked.status).toBe(429);
       });
 
       it("handles CORS OPTIONS preflight request", async () => {

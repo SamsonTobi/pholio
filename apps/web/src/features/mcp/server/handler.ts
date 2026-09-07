@@ -1,11 +1,17 @@
 import { mcpSchemas } from "@pholio/shared/mcpSchemas";
-import { getProjectBySlug, updateProject } from "@/features/projects/server/service";
+import { getProjectBySlugAsOwner, updateProject } from "@/features/projects/server/service";
 import { publishShowcase } from "@/features/showcases/server/service";
 import { reparseProject } from "@/features/github-sync/server/service";
 import { uploadMockup } from "@/features/mockups/server/service";
 import { getStats } from "@/features/telemetry/server/service";
 import { getLeaderboardSnapshot } from "@/features/leaderboard/server/service";
 import { ZodError } from "zod";
+
+// NOTE: transport is hand-rolled JSON-RPC over HTTPS (MCP Streamable HTTP
+// compatible). @modelcontextprotocol/sdk is declared in apps/web/package.json;
+// adopting its server transport + zodToJsonSchema is a tracked follow-up.
+// Per-key rate limiting is enforced in /api/mcp (in-memory, single instance;
+// use Redis/Upstash keyed by key prefix for multi-instance prod).
 
 export interface McpContext {
   userId: string;
@@ -78,6 +84,7 @@ export const MCP_TOOLS_DEFINITIONS = [
         project_slug: { type: "string", description: "The slug of the project" },
         file_base64: { type: "string", description: "Base64 encoded image string" },
         device: { type: "string", enum: ["browser", "phone", "tablet"], description: "Mockup device frame type" },
+        mime_type: { type: "string", enum: ["image/png", "image/jpeg", "image/webp"], default: "image/png", description: "Image MIME type (SVG is rejected)" },
       },
       required: ["project_slug", "file_base64", "device"],
     },
@@ -100,11 +107,26 @@ export const MCP_TOOLS_DEFINITIONS = [
     inputSchema: {
       type: "object",
       properties: {
-        group_slug: { type: "string", description: "Optional hacker group slug" },
+        group_slug: { type: "string", description: "Hacker group slug (required)" },
       },
+      required: ["group_slug"],
     },
   },
 ];
+
+const WRITE_TOOLS = new Set(["update_project", "publish_showcase", "sync_readme", "upload_mockup"]);
+
+function requireScope(toolName: string, scopes: string[], required: string): void {
+  if (!scopes.includes(required)) {
+    const err = new Error(`Insufficient scope for tool ${toolName}: ${required} required`) as Error & { code?: number };
+    err.code = -32600;
+    throw err;
+  }
+}
+
+function requireWriteScope(toolName: string, scopes: string[]): void {
+  requireScope(toolName, scopes, "showcase:write");
+}
 
 async function handleToolCall(
   name: string,
@@ -115,9 +137,13 @@ async function handleToolCall(
 
   switch (normalizedName) {
     case "update_project": {
+      requireWriteScope(normalizedName, context.scopes);
       const parsed = mcpSchemas.updateProject.parse(args || {});
-      const project = await getProjectBySlug(context.userId, parsed.project_slug);
-      const projectId = project ? project.id : parsed.project_slug;
+      const project = await getProjectBySlugAsOwner(context.userId, parsed.project_slug);
+      if (!project) {
+        throw new Error(`Project not found: ${parsed.project_slug}`);
+      }
+      const projectId = project.id;
 
       const updates: any = {};
       if (parsed.summary !== undefined) updates.readme_summary = parsed.summary;
@@ -125,7 +151,7 @@ async function handleToolCall(
       if (parsed.live_url !== undefined) updates.live_url = parsed.live_url;
       if (parsed.status !== undefined) updates.status = parsed.status;
 
-      const updated = await updateProject(projectId, updates);
+      const updated = await updateProject(projectId, updates, context.userId);
       return {
         content: [
           {
@@ -137,9 +163,13 @@ async function handleToolCall(
     }
 
     case "publish_showcase": {
+      requireWriteScope(normalizedName, context.scopes);
       const parsed = mcpSchemas.publishShowcase.parse(args || {});
-      const project = await getProjectBySlug(context.userId, parsed.project_slug);
-      const projectId = project ? project.id : parsed.project_slug;
+      const project = await getProjectBySlugAsOwner(context.userId, parsed.project_slug);
+      if (!project) {
+        throw new Error(`Project not found: ${parsed.project_slug}`);
+      }
+      const projectId = project.id;
 
       const showcase = await publishShowcase({
         ownerId: context.userId,
@@ -159,11 +189,15 @@ async function handleToolCall(
     }
 
     case "sync_readme": {
+      requireWriteScope(normalizedName, context.scopes);
       const parsed = mcpSchemas.syncReadme.parse(args || {});
-      const project = await getProjectBySlug(context.userId, parsed.project_slug);
-      const projectId = project ? project.id : parsed.project_slug;
+      const project = await getProjectBySlugAsOwner(context.userId, parsed.project_slug);
+      if (!project) {
+        throw new Error(`Project not found: ${parsed.project_slug}`);
+      }
+      const projectId = project.id;
 
-      const success = await reparseProject(projectId);
+      const success = await reparseProject(projectId, context.userId);
       return {
         content: [
           {
@@ -175,32 +209,28 @@ async function handleToolCall(
     }
 
     case "upload_mockup": {
+      requireWriteScope(normalizedName, context.scopes);
       const parsed = mcpSchemas.uploadMockup.parse(args || {});
-      const project = await getProjectBySlug(context.userId, parsed.project_slug);
-      const projectId = project ? project.id : parsed.project_slug;
+      const project = await getProjectBySlugAsOwner(context.userId, parsed.project_slug);
+      if (!project) {
+        throw new Error(`Project not found: ${parsed.project_slug}`);
+      }
+      const projectId = project.id;
 
+      if (parsed.file_base64.length > 7 * 1024 * 1024) {
+        throw new Error("file_base64 exceeds 7MB pre-decode limit");
+      }
       const rawBase64 = parsed.file_base64.replace(/^data:[^;]+;base64,/, "");
       const fileBuffer = Buffer.from(rawBase64, "base64");
 
-      let mockup;
-      try {
-        mockup = await uploadMockup({
-          ownerId: context.userId,
-          projectId,
-          fileBuffer,
-          fileName: `mockup-${Date.now()}.png`,
-          mimeType: "image/png",
-          device: parsed.device,
-        });
-      } catch {
-        mockup = {
-          id: `m-${Date.now()}`,
-          project_id: projectId,
-          storage_path: `mockups/${projectId}/mockup.png`,
-          device: parsed.device,
-          sort: 0,
-        };
-      }
+      const mockup = await uploadMockup({
+        ownerId: context.userId,
+        projectId,
+        fileBuffer,
+        fileName: `mockup-${Date.now()}.png`,
+        mimeType: parsed.mime_type ?? "image/png",
+        device: parsed.device,
+      });
 
       return {
         content: [
@@ -213,6 +243,7 @@ async function handleToolCall(
     }
 
     case "get_stats": {
+      requireScope(normalizedName, context.scopes, "stats:read");
       const parsed = mcpSchemas.getStats.parse(args || {});
       const stats = await getStats({
         projectSlug: parsed.project_slug,
@@ -230,9 +261,14 @@ async function handleToolCall(
     }
 
     case "get_leaderboard": {
+      requireScope(normalizedName, context.scopes, "leaderboard:read");
       const parsed = mcpSchemas.getLeaderboard.parse(args || {});
-      const groupSlug = parsed.group_slug || "lagos-hackers";
-      const leaderboard = await getLeaderboardSnapshot(groupSlug, context.userId);
+      if (!parsed.group_slug) {
+        const err = new Error("Invalid params: group_slug is required") as Error & { code?: number };
+        err.code = -32602;
+        throw err;
+      }
+      const leaderboard = await getLeaderboardSnapshot(parsed.group_slug, context.userId);
 
       return {
         content: [
@@ -343,6 +379,39 @@ export async function processSingleMcpMessage(
           };
         }
 
+        if (err.message && err.message.startsWith("Project not found")) {
+          return {
+            jsonrpc: "2.0",
+            id: reqId,
+            error: {
+              code: -32602,
+              message: err.message,
+            },
+          };
+        }
+
+        if (err.message && err.message.startsWith("Insufficient scope")) {
+          return {
+            jsonrpc: "2.0",
+            id: reqId,
+            error: {
+              code: -32600,
+              message: err.message,
+            },
+          };
+        }
+
+        if (typeof err.code === "number") {
+          return {
+            jsonrpc: "2.0",
+            id: reqId,
+            error: {
+              code: err.code,
+              message: err.message || "Invalid params",
+            },
+          };
+        }
+
         return {
           jsonrpc: "2.0",
           id: reqId,
@@ -371,6 +440,17 @@ export async function handleMcpRequest(
   context: McpContext
 ): Promise<JsonRpcResponse | JsonRpcResponse[]> {
   if (Array.isArray(body)) {
+    // Cap batch size: unbounded arrays are a CPU/memory DoS vector.
+    if (body.length > 25) {
+      return {
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32600,
+          message: "Invalid Request: batch too large (max 25)",
+        },
+      };
+    }
     return Promise.all(body.map((item) => processSingleMcpMessage(item, context)));
   }
 

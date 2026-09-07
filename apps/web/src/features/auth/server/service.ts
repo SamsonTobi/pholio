@@ -10,9 +10,14 @@ export async function getSessionUser() {
   return user;
 }
 
-export async function requireUser() {
+export async function requireUser(next?: string) {
   const user = await getSessionUser();
   if (!user) {
+    // Middleware already preserves ?next for protected routes; accept an explicit
+    // path when callers have it, keeping the default safe.
+    if (next && next.startsWith("/") && !next.startsWith("//") && !next.includes(":")) {
+      redirect(`/login?next=${encodeURIComponent(next)}`);
+    }
     redirect("/login");
   }
   return user;

@@ -3,6 +3,19 @@ import { NextResponse, type NextRequest } from "next/server";
 import { Database } from "./types";
 import { env } from "@/lib/env";
 
+export function getSafeNext(next: string | null): string {
+  if (!next) return "/dashboard";
+  // Allow only absolute paths starting with single "/" (no "//", no scheme)
+  if (!next.startsWith("/") || next.startsWith("//") || next.includes(":")) {
+    return "/dashboard";
+  }
+  return next;
+}
+
+function isProtectedPath(pathname: string): boolean {
+  return pathname.startsWith("/dashboard") || pathname.startsWith("/pick-repos");
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -32,7 +45,17 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user && isProtectedPath(request.nextUrl.pathname)) {
+    const next = encodeURIComponent(
+      request.nextUrl.pathname + request.nextUrl.search
+    );
+    const loginUrl = new URL(`/login?next=${next}`, request.url);
+    return NextResponse.redirect(loginUrl);
+  }
 
   return supabaseResponse;
 }

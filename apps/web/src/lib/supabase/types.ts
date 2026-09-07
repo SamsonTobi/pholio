@@ -122,6 +122,7 @@ export type Database = {
           event_type: "push" | "release" | "manual" | "cron" | "import" | null;
           pushed_at: string;
           commit_sha: string | null;
+          delivery_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -131,6 +132,7 @@ export type Database = {
           event_type?: "push" | "release" | "manual" | "cron" | "import" | null;
           pushed_at?: string;
           commit_sha?: string | null;
+          delivery_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -140,6 +142,7 @@ export type Database = {
           event_type?: "push" | "release" | "manual" | "cron" | "import" | null;
           pushed_at?: string;
           commit_sha?: string | null;
+          delivery_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -404,6 +407,33 @@ export type Database = {
           key_hash?: string;
           scopes?: string[];
           revoked_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      realtime_outbox: {
+        Row: {
+          id: number;
+          table_name: string | null;
+          row_id: string | null;
+          channel: string;
+          payload: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          table_name?: string | null;
+          row_id?: string | null;
+          channel: string;
+          payload?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          table_name?: string | null;
+          row_id?: string | null;
+          channel?: string;
+          payload?: Json;
           created_at?: string;
         };
         Relationships: [];

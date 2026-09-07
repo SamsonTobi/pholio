@@ -45,7 +45,7 @@ describe("resolveProjectIcon", () => {
       githubRepoId: 404,
     });
     expect(icon1.source).toBe("initial_tile");
-    expect(icon1.url).toContain("dicebear");
+    expect(icon1.url.startsWith("data:image/svg+xml;base64,")).toBe(true);
     expect(icon1.url).toBe(icon2.url);
   });
 });

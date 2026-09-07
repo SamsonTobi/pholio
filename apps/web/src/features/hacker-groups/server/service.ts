@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { env } from "@/lib/env";
+import crypto from "crypto";
 import { Database } from "@/lib/supabase/types";
 import { CreateGroupInput } from "./schema";
 import { inviteUrl } from "@/lib/env";
@@ -44,6 +46,22 @@ export interface PeerActivityItem {
   avatar_url: string | null;
   message: string;
   timestamp: string;
+}
+
+function isSupabaseLive(): boolean {
+  return Boolean(
+    env.NEXT_PUBLIC_SUPABASE_URL &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
+      !env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") &&
+      !env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
+  );
+}
+
+/** Rethrow live-backend failures instead of serving demo rows in production. */
+function rethrowIfLive(err: unknown): void {
+  if (isSupabaseLive()) {
+    throw err instanceof Error ? err : new Error("Service unavailable");
+  }
 }
 
 // In-memory demo fallback storage
@@ -258,15 +276,24 @@ export async function createGroup(params: {
       .single();
 
     if (createError) {
-      throw new Error(createError.message);
+      const msg = createError.message || "";
+      if ((createError as { code?: string }).code === "23505" || msg.includes("duplicate")) {
+        throw new Error("A hacker group with this slug already exists");
+      }
+      throw new Error(msg || "Failed to create hacker group");
     }
 
-    // Add creator as owner
-    await (supabase.from("hacker_group_members") as any).insert({
+    // Add creator as owner — clean up the group if this fails (no orphan groups)
+    const { error: memberError } = await (supabase.from("hacker_group_members") as any).insert({
       group_id: group.id,
       user_id: params.ownerId,
       role: "owner",
     });
+
+    if (memberError) {
+      await (supabase.from("hacker_groups") as any).delete().eq("id", group.id);
+      throw new Error(memberError.message || "Failed to add creator as owner");
+    }
 
     return {
       ...group,
@@ -277,7 +304,8 @@ export async function createGroup(params: {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "";
     if (message.includes("already exists")) throw err;
-    // Fallback in memory
+    rethrowIfLive(err);
+    // Offline demo fallback (dev/test only)
   }
 
   const existingDemo = DEMO_GROUPS.find((g) => g.slug === cleanSlug);
@@ -411,9 +439,14 @@ export async function updateGroup(params: {
     if (message.includes("already exists") || message.includes("Forbidden") || message.includes("not found")) {
       throw err;
     }
+    rethrowIfLive(err);
   }
 
-  // Demo fallback
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
   const demo = DEMO_GROUPS.find((g) => g.id === params.groupId);
   if (!demo) throw new Error("Hacker group not found");
   const isOwner =
@@ -506,11 +539,15 @@ export async function getGroupBySlug(
         isGate,
       };
     }
-  } catch {
-    // Database connection fallback
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
-  // Demo fallback
+  if (process.env.NODE_ENV === "production") {
+    return { group: null };
+  }
+
+  // Offline demo fallback (dev/test only)
   let demo = DEMO_GROUPS.find((g) => g.slug === slug);
   let canonicalSlug: string | undefined;
 
@@ -549,7 +586,7 @@ export async function createInvite(params: {
   githubUsername?: string | null;
   multiUse?: boolean;
 }): Promise<{ token: string; invite_url: string; multi_use: boolean }> {
-  const token = `inv-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+  const token = `pholio-inv-${crypto.randomUUID()}`;
   const multiUse = params.multiUse ?? true;
 
   try {
@@ -583,10 +620,23 @@ export async function createInvite(params: {
     if (error) {
       throw new Error(error.message);
     }
+
+    return {
+      token,
+      invite_url: inviteUrl(token),
+      multi_use: multiUse,
+    };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "";
     if (message.includes("Forbidden")) throw err;
+    rethrowIfLive(err);
   }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
 
   DEMO_INVITES[token] = {
     group_id: params.groupId,
@@ -624,10 +674,17 @@ export async function joinGroupByToken(
   const userId = typeof paramsOrToken === "string" ? maybeUserId! : paramsOrToken.userId;
   const token = typeof paramsOrToken === "string" ? paramsOrToken : paramsOrToken.token;
 
+  // Invite + membership writes must work under 032 RLS (member rows are not
+  // self-insertable). Validate the token, then write via the admin client.
+  // Offline fast path first: never hit the network without a linked backend.
+  if (!isSupabaseLive()) {
+    return joinDemoGroupByToken(token);
+  }
   try {
     const supabase = await createClient();
+    const admin = createAdminClient();
 
-    const { data: invite, error: inviteErr } = await (supabase.from("hacker_group_invites") as any)
+    const { data: invite, error: inviteErr } = await (admin.from("hacker_group_invites") as any)
       .select("*, hacker_groups(id, slug)")
       .eq("token", token)
       .maybeSingle();
@@ -658,24 +715,44 @@ export async function joinGroupByToken(
     const groupSlug = invite.hacker_groups.slug;
 
     // Check if already a member
-    const { data: existingMember } = await (supabase.from("hacker_group_members") as any)
+    const { data: existingMember } = await (admin.from("hacker_group_members") as any)
       .select("user_id")
       .eq("group_id", groupId)
       .eq("user_id", userId)
       .maybeSingle();
 
     if (!existingMember) {
-      await (supabase.from("hacker_group_members") as any).insert({
+      const { error: joinError } = await (admin.from("hacker_group_members") as any).insert({
         group_id: groupId,
         user_id: userId,
         role: "member",
       });
+      if (joinError) {
+        // Already joined concurrently → treat as success; else real failure.
+        const { data: raced } = await (admin.from("hacker_group_members") as any)
+          .select("user_id")
+          .eq("group_id", groupId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!raced) throw new Error(joinError.message || "Failed to join hacker group");
+      }
     }
 
     if (!invite.multi_use) {
-      await (supabase.from("hacker_group_invites") as any)
+      // Compare-and-swap: only the first concurrent redeemer marks used_at.
+      // If we lost the race, roll back our membership insert.
+      const { data: casRows } = await (admin.from("hacker_group_invites") as any)
         .update({ used_at: new Date().toISOString() })
-        .eq("token", token);
+        .eq("token", token)
+        .is("used_at", null)
+        .select("token");
+      if (!casRows || casRows.length === 0) {
+        await (admin.from("hacker_group_members") as any)
+          .delete()
+          .eq("group_id", groupId)
+          .eq("user_id", userId);
+        throw new Error("This invite token has already been used");
+      }
     }
 
     return { success: true, groupSlug, groupId };
@@ -684,15 +761,22 @@ export async function joinGroupByToken(
     if (message.includes("Invalid") || message.includes("already been used") || message.includes("reserved")) {
       throw err;
     }
+    rethrowIfLive(err);
   }
 
-  // Demo fallback
+  if (isSupabaseLive() || process.env.NODE_ENV === "production") {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
+  return joinDemoGroupByToken(token);
+}
+
+function joinDemoGroupByToken(
+  token: string
+): { success: boolean; groupSlug: string; groupId?: string } {
   const demoInvite = DEMO_INVITES[token];
   if (!demoInvite) {
-    const firstGroup = DEMO_GROUPS[0];
-    if (token.startsWith("inv-") && firstGroup) {
-      return { success: true, groupSlug: firstGroup.slug, groupId: firstGroup.id };
-    }
     throw new Error("Invalid or expired invite token");
   }
 
@@ -749,22 +833,54 @@ export async function addMemberByGithubUsername(params: {
       throw new Error(`User with GitHub username @${targetUsername} not found on Pholio`);
     }
 
-    // Add to group
-    await (supabase.from("hacker_group_members") as any).upsert({
-      group_id: params.groupId,
-      user_id: profile.id,
-      role: "member",
-    });
+    // Add to group via admin client (member rows aren't owner-writable
+    // under RLS; ownership was verified above).
+    const { error: addError } = await (createAdminClient().from("hacker_group_members") as any).upsert(
+      {
+        group_id: params.groupId,
+        user_id: profile.id,
+        role: "member",
+      },
+      { onConflict: "group_id,user_id" }
+    );
+
+    if (addError) throw new Error(addError.message);
+
+    // Best-effort invite email (never fail the add on error).
+    try {
+      const { getUserEmail } = await import("@/features/notifications/server/service");
+      const { sendNotificationEmail } = await import("@/features/notifications/server/email");
+      const { data: grp } = await (supabase.from("hacker_groups") as any)
+        .select("name, slug")
+        .eq("id", params.groupId)
+        .maybeSingle();
+      const email = await getUserEmail(profile.id);
+      if (email) {
+        await sendNotificationEmail({
+          to: email,
+          type: "invite",
+          payload: { groupName: grp?.name || "Hacker Group", groupSlug: grp?.slug || "", token: "" },
+        });
+      }
+    } catch (emailErr) {
+      console.error("invite email failed", emailErr);
+    }
 
     return { success: true, memberId: profile.id, githubUsername: targetUsername };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "";
     if (message.includes("Forbidden") || message.includes("not found")) throw err;
+    rethrowIfLive(err);
   }
 
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only) — clearly fake, never a real member
   return {
     success: true,
-    memberId: `user-${Date.now()}`,
+    memberId: `demo-user-${Date.now()}`,
     githubUsername: targetUsername,
   };
 }
@@ -811,9 +927,9 @@ export async function listGroupMembers(params: {
         members.map(async (m: any) => {
           const profile = profiles?.find((p: any) => p.id === m.user_id);
 
-          const { count: pushesCount } = await (supabase.from("github_sync_events") as any)
+          const { count: pushesCount } = await (createAdminClient().from("github_sync_events") as any)
             .select("*", { count: "exact", head: true })
-            .eq("user_id", m.user_id)
+            .eq("owner_id", m.user_id)
             .gte("created_at", weekAgo);
 
           const { count: showcasesCount } = await (supabase.from("showcases") as any)
@@ -873,10 +989,15 @@ export async function listGroupMembers(params: {
 
       return leaderboard;
     }
-  } catch {
-    // Database fallback
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
+  if (process.env.NODE_ENV === "production") {
+    return [];
+  }
+
+  // Offline demo fallback (dev/test only)
   return DEMO_MEMBERS[groupId] || [];
 }
 
@@ -921,10 +1042,15 @@ export async function listGroupsForUser(
         return enriched;
       }
     }
-  } catch {
-    // Database connection fallback
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
+  if (process.env.NODE_ENV === "production") {
+    return [];
+  }
+
+  // Offline demo fallback (dev/test only)
   return DEMO_GROUPS;
 }
 
@@ -968,9 +1094,14 @@ export async function leaveOrRemoveMember(params: {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "";
     if (message.includes("Forbidden")) throw err;
+    rethrowIfLive(err);
   }
 
-  // Demo fallback
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
   if (DEMO_MEMBERS[params.groupId]) {
     DEMO_MEMBERS[params.groupId] = DEMO_MEMBERS[params.groupId].filter(
       (m) => m.user_id !== params.targetUserId
@@ -1008,9 +1139,9 @@ export async function getGroupPeerFeed(groupId: string): Promise<PeerActivityIte
         .order("published_at", { ascending: false })
         .limit(10);
 
-      const { data: recentPushes } = await (supabase.from("github_sync_events") as any)
-        .select("id, user_id, event_type, commit_sha, created_at")
-        .in("user_id", userIds)
+      const { data: recentPushes } = await (createAdminClient().from("github_sync_events") as any)
+        .select("id, owner_id, event_type, commit_sha, created_at")
+        .in("owner_id", userIds)
         .order("created_at", { ascending: false })
         .limit(10);
 
@@ -1030,7 +1161,7 @@ export async function getGroupPeerFeed(groupId: string): Promise<PeerActivityIte
       });
 
       recentPushes?.forEach((push: any) => {
-        const p = profileMap.get(push.user_id);
+        const p = profileMap.get(push.owner_id);
         feed.push({
           id: `push-${push.id}`,
           type: "push",
@@ -1045,10 +1176,16 @@ export async function getGroupPeerFeed(groupId: string): Promise<PeerActivityIte
       feed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       return feed.slice(0, 15);
     }
-  } catch {
-    // Fallback
+    return [];
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
+  if (process.env.NODE_ENV === "production") {
+    return [];
+  }
+
+  // Offline demo fallback (dev/test only)
   return DEMO_ACTIVITIES[groupId] || [];
 }
 
@@ -1062,9 +1199,14 @@ export async function getInviteByToken(token: string): Promise<{
   group_id?: string;
   visibility?: string;
 }> {
+  // Offline fast path first: never hit the network without a linked backend.
+  if (!isSupabaseLive()) {
+    return getDemoInviteByToken(token);
+  }
   try {
-    const supabase = await createClient();
-    const { data: invite } = await (supabase.from("hacker_group_invites") as any)
+    // Invites are not member-readable under RLS: validate via admin client.
+    const admin = createAdminClient();
+    const { data: invite } = await (admin.from("hacker_group_invites") as any)
       .select("*, hacker_groups(id, name, slug, visibility)")
       .eq("token", token)
       .maybeSingle();
@@ -1078,10 +1220,25 @@ export async function getInviteByToken(token: string): Promise<{
         visibility: invite.hacker_groups.visibility,
       };
     }
-  } catch {
-    // Fallback
+  } catch (err) {
+    rethrowIfLive(err);
   }
 
+  if (process.env.NODE_ENV === "production") {
+    return { valid: false };
+  }
+
+  // Offline demo fallback (dev/test only)
+  return getDemoInviteByToken(token);
+}
+
+function getDemoInviteByToken(token: string): {
+  valid: boolean;
+  group_name?: string;
+  group_slug?: string;
+  group_id?: string;
+  visibility?: string;
+} {
   const demoInvite = DEMO_INVITES[token];
   if (demoInvite) {
     const group = DEMO_GROUPS.find((g) => g.id === demoInvite.group_id);

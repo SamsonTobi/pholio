@@ -9,6 +9,8 @@ import {
 } from "./scoring";
 import { getGroupBySlug, LeaderboardMember, HackerGroupWithMeta } from "@/features/hacker-groups/server/service";
 import { createNotification } from "@/features/notifications/server/service";
+import { getUserEmail } from "@/features/notifications/server/service";
+import { sendNotificationEmail } from "@/features/notifications/server/email";
 
 export interface LeaderboardSnapshotResult {
   group: HackerGroupWithMeta | null;
@@ -39,6 +41,13 @@ function getPastDateString(daysAgo: number): string {
 
 function countActiveMembers(members: LeaderboardMember[]): number {
   return members.filter((m) => m.activity_score > 0 || m.pushes_7d > 0 || m.showcases_7d > 0).length;
+}
+
+/** Rethrow live-backend failures instead of serving demo rows in production. */
+function rethrowIfLive(err: unknown): void {
+  if (isSupabaseLive()) {
+    throw err instanceof Error ? err : new Error("Service unavailable");
+  }
 }
 
 // In-memory fallback snapshots for demo/test environments
@@ -164,59 +173,69 @@ export async function computeLeaderboard(groupId: string): Promise<{
           });
         }
 
-        // 3. Compute 7d metrics for each member
+        // 3. Compute 7d metrics for each member — batched (3 queries total,
+        // not 3 per member) so large groups don't N+1 the database.
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        const rawRankings: LeaderboardMember[] = await Promise.all(
-          members.map(async (m: any) => {
-            const profile: any = profileMap.get(m.user_id);
+        const [{ data: syncRows }, { data: showcaseRows }, { data: pushRows }] =
+          await Promise.all([
+            (admin.from("github_sync_events") as any)
+              .select("owner_id")
+              .in("owner_id", userIds)
+              .gte("created_at", weekAgo),
+            (admin.from("showcases") as any)
+              .select("owner_id")
+              .in("owner_id", userIds)
+              .gte("published_at", weekAgo),
+            (admin.from("projects") as any)
+              .select("owner_id, last_push_at")
+              .in("owner_id", userIds),
+          ]);
 
-            // Count pushes in last 7 days
-            const { count: pushesCount } = await (admin.from("github_sync_events") as any)
-              .select("*", { count: "exact", head: true })
-              .or(`user_id.eq.${m.user_id},owner_id.eq.${m.user_id}`)
-              .gte("created_at", weekAgo);
+        const pushesByUser = new Map<string, number>();
+        for (const r of syncRows ?? []) {
+          pushesByUser.set(r.owner_id, (pushesByUser.get(r.owner_id) || 0) + 1);
+        }
+        const showcasesByUser = new Map<string, number>();
+        for (const r of showcaseRows ?? []) {
+          showcasesByUser.set(r.owner_id, (showcasesByUser.get(r.owner_id) || 0) + 1);
+        }
+        const lastPushByUser = new Map<string, string | null>();
+        for (const r of pushRows ?? []) {
+          const prev = lastPushByUser.get(r.owner_id);
+          if (!prev || (r.last_push_at && r.last_push_at > prev)) {
+            lastPushByUser.set(r.owner_id, r.last_push_at ?? null);
+          }
+        }
 
-            // Count showcases in last 7 days
-            const { count: showcasesCount } = await (admin.from("showcases") as any)
-              .select("*", { count: "exact", head: true })
-              .eq("owner_id", m.user_id)
-              .gte("published_at", weekAgo);
+        const rawRankings: LeaderboardMember[] = members.map((m: any) => {
+          const profile: any = profileMap.get(m.user_id);
 
-            // Fetch latest push time
-            const { data: latestProj } = await (admin.from("projects") as any)
-              .select("last_push_at")
-              .eq("owner_id", m.user_id)
-              .order("last_push_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
+          const lastPushAt = lastPushByUser.get(m.user_id) || null;
+          const pushes7d = pushesByUser.get(m.user_id) || 0;
+          const showcases7d = showcasesByUser.get(m.user_id) || 0;
 
-            const lastPushAt = latestProj?.last_push_at || null;
-            const pushes7d = pushesCount || 0;
-            const showcases7d = showcasesCount || 0;
+          const score = computeActivityScore({
+            pushes7d,
+            showcases7d,
+            lastPushAt,
+          });
 
-            const score = computeActivityScore({
-              pushes7d,
-              showcases7d,
-              lastPushAt,
-            });
-
-            return {
-              user_id: m.user_id,
-              display_name: profile?.display_name || profile?.slug || "Hacker",
-              slug: profile?.slug || "user",
-              avatar_url: profile?.avatar_url || null,
-              role: m.role,
-              activity_score: score,
-              pushes_7d: pushes7d,
-              showcases_7d: showcases7d,
-              last_push_at: lastPushAt,
-              current_rank: 0,
-              previous_rank: yesterdayRanks[m.user_id] ?? null,
-              delta: { delta: 0, direction: "same" },
-            };
-          })
-        );
+          return {
+            user_id: m.user_id,
+            display_name: profile?.display_name || profile?.slug || "Hacker",
+            slug: profile?.slug || "user",
+            avatar_url: profile?.avatar_url || null,
+            role: m.role,
+            activity_score: score,
+            pushes_7d: pushes7d,
+            showcases_7d: showcases7d,
+            last_push_at: lastPushAt,
+            current_rank: 0,
+            previous_rank: yesterdayRanks[m.user_id] ?? null,
+            delta: { delta: 0, direction: "same" },
+          };
+        });
 
         // Sort descending by activity_score, tie-break by showcases_7d desc, then pushes_7d desc
         rawRankings.sort((a, b) => {
@@ -250,29 +269,74 @@ export async function computeLeaderboard(groupId: string): Promise<{
 
         if (pastSnap && Array.isArray(pastSnap.rankings)) {
           const prevActives = countActiveMembers(pastSnap.rankings as LeaderboardMember[]);
-          if (prevActives > 0) {
-            const growth = (currentActives - prevActives) / prevActives;
-            if (growth >= 0.4) {
-              spikeDetected = true;
-              growthPercent = Math.round(growth * 100);
+          // 0 -> N counts as a spike (new group activation); clamp absurd values.
+          const growth =
+            prevActives > 0
+              ? (currentActives - prevActives) / prevActives
+              : currentActives > 0
+                ? 1
+                : 0;
+          if (growth >= 0.4) {
+            spikeDetected = true;
+            growthPercent = Math.min(999, Math.round(growth * 100));
 
-              if (group) {
+            if (group) {
+              // Once-per-day dedup per group: skip if a spike notification
+              // for THIS group was already created today (compute can run
+              // from cron and on demand).
+              const dayStart = new Date();
+              dayStart.setHours(0, 0, 0, 0);
+              const { data: todaysSpikes } = await (admin.from("notifications") as any)
+                .select("id, payload")
+                .eq("type", "spike")
+                .gte("created_at", dayStart.toISOString())
+                .limit(50);
+
+              const alreadyNotified = (todaysSpikes ?? []).some(
+                (n: any) => n?.payload?.group_id === groupId
+              );
+
+              if (!alreadyNotified) {
                 const notifyTargetIds = Array.from(new Set([group.created_by, ...userIds].filter(Boolean)));
-                for (const targetId of notifyTargetIds) {
-                  await createNotification({
-                    userId: targetId,
-                    type: "spike",
-                    payload: {
-                      title: "Active user growth spike detected!",
-                      message: `${group.name} surged by +${growthPercent}% active builders over the last 48 hours.`,
-                      group_id: groupId,
-                      group_name: group.name,
-                      group_slug: group.slug,
-                      spike_percentage: growthPercent,
-                      actives_7d: currentActives,
-                      url: `/hacker-groups/${group.slug}`,
-                    },
-                  });
+                await Promise.all(
+                  notifyTargetIds.map((targetId) =>
+                    createNotification({
+                      userId: targetId,
+                      type: "spike",
+                      payload: {
+                        title: "Active user growth spike detected!",
+                        message: `${group.name} surged by +${growthPercent}% active builders over the last 48 hours.`,
+                        group_id: groupId,
+                        group_name: group.name,
+                        group_slug: group.slug,
+                        spike_percentage: growthPercent,
+                        actives_7d: currentActives,
+                        url: `/hacker-groups/${group.slug}`,
+                      },
+                    })
+                  )
+                );
+                // Best-effort spike emails (never fail the compute on error).
+                // Capped recipient fan-out for large groups.
+                try {
+                  const emailIds = notifyTargetIds.slice(0, 50);
+                  const emails = (
+                    await Promise.all(emailIds.map((id) => getUserEmail(id as string)))
+                  ).filter((e): e is string => !!e);
+                  if (emails.length > 0) {
+                    await sendNotificationEmail({
+                      to: emails,
+                      type: "spike",
+                      payload: {
+                        groupName: group.name,
+                        groupSlug: group.slug,
+                        spikePercent: growthPercent,
+                        actives7d: currentActives,
+                      },
+                    });
+                  }
+                } catch (emailErr) {
+                  console.error("spike email failed", emailErr);
                 }
               }
             }
@@ -298,12 +362,16 @@ export async function computeLeaderboard(groupId: string): Promise<{
           growth_percent: growthPercent,
         };
       }
-    } catch {
-      // Database connection fallback
+  } catch (err) {
+      rethrowIfLive(err);
     }
   }
 
-  // Fallback demo computation
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
   const demoRankings: LeaderboardMember[] = [
     {
       user_id: "00000000-0000-0000-0000-000000000001",
@@ -358,11 +426,15 @@ export async function computeLeaderboard(groupId: string): Promise<{
   const pastDemo = DEMO_SNAPSHOTS[groupId]?.[twoDaysAgo];
   if (pastDemo) {
     const prevActives = countActiveMembers(pastDemo);
-    if (prevActives > 0) {
-      const growth = (currentActives - prevActives) / prevActives;
-      if (growth >= 0.4) {
-        spikeDetected = true;
-        growthPercent = Math.round(growth * 100);
+    const growth =
+      prevActives > 0
+        ? (currentActives - prevActives) / prevActives
+        : currentActives > 0
+          ? 1
+          : 0;
+    if (growth >= 0.4) {
+      spikeDetected = true;
+      growthPercent = Math.min(999, Math.round(growth * 100));
 
         await createNotification({
           userId: "00000000-0000-0000-0000-000000000001",
@@ -376,7 +448,6 @@ export async function computeLeaderboard(groupId: string): Promise<{
           },
         });
       }
-    }
   }
 
   if (!DEMO_SNAPSHOTS[groupId]) DEMO_SNAPSHOTS[groupId] = {};
@@ -439,16 +510,20 @@ export async function getLeaderboardSnapshot(
         }
       }
 
-      if (!todayRankings) {
-        const live = await computeLeaderboard(group.id);
-        todayRankings = live.rankings;
+      // Read path serves stored snapshots only — compute+notify runs from
+      // the daily cron (computeLeaderboard), never from a GET.
+      if (!todayRankings && snapshots && snapshots.length > 0) {
+        const latest = snapshots[0];
+        if (Array.isArray(latest.rankings)) {
+          todayRankings = latest.rankings as LeaderboardMember[];
+        }
       }
 
       return {
         group,
         day: today,
-        rankings: todayRankings,
-        actives_7d: countActiveMembers(todayRankings),
+        rankings: todayRankings ?? [],
+        actives_7d: countActiveMembers(todayRankings ?? []),
         yesterday_snapshot: yesterdayRankings
           ? {
               day: yesterday,
@@ -456,12 +531,16 @@ export async function getLeaderboardSnapshot(
             }
           : null,
       };
-    } catch {
-      // Database connection fallback
+    } catch (err) {
+      rethrowIfLive(err);
     }
   }
 
-  // Fallback demo response
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Service unavailable");
+  }
+
+  // Offline demo fallback (dev/test only)
   const demoToday = DEMO_SNAPSHOTS[group.id]?.[today] || (await computeLeaderboard(group.id)).rankings;
   const demoYesterday = DEMO_SNAPSHOTS[group.id]?.[yesterday] || null;
 

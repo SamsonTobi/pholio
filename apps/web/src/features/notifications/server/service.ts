@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { env } from "@/lib/env";
 import { Database } from "@/lib/supabase/types";
 
 export type NotificationType = "digest" | "spike" | "peer_push" | "invite";
@@ -83,6 +84,34 @@ let DEMO_NOTIFICATIONS: NotificationItem[] = [
   },
 ];
 
+function isSupabaseLive(): boolean {
+  return Boolean(
+    env.NEXT_PUBLIC_SUPABASE_URL &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
+      !env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") &&
+      !env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
+  );
+}
+
+const isProd = () => process.env.NODE_ENV === "production";
+
+/**
+ * Looks up a user's login email via the admin API (profiles carry no email).
+ * Returns null when unavailable — callers treat email as best-effort.
+ */
+export async function getUserEmail(userId: string): Promise<string | null> {
+  // Offline fast path: never hit the network without a linked backend.
+  if (!isSupabaseLive()) return null;
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (error || !data?.user?.email) return null;
+    return data.user.email;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Lists notifications for a user ordered by created_at desc with a limit of 50.
  */
@@ -95,14 +124,17 @@ export async function listNotifications(userId: string): Promise<NotificationIte
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       return data as NotificationItem[];
     }
-  } catch {
-    // Database connection fallback
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    if (isSupabaseLive() || isProd()) throw err instanceof Error ? err : new Error("Service unavailable");
   }
 
-  return DEMO_NOTIFICATIONS.slice(0, 50);
+  // Offline demo fallback (dev/test only) — scoped to the caller's own id
+  // so one user never sees another user's rows.
+  return DEMO_NOTIFICATIONS.filter((n) => n.user_id === userId).slice(0, 50);
 }
 
 /**
@@ -126,12 +158,15 @@ export async function markNotificationRead(
     if (!error && data) {
       return data as NotificationItem;
     }
-  } catch {
-    // Fallback
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    if (isSupabaseLive() || isProd()) throw err instanceof Error ? err : new Error("Service unavailable");
   }
 
+  // Offline demo fallback (dev/test only)
   const notif = DEMO_NOTIFICATIONS.find((n) => n.id === notificationId);
   if (notif) {
+    if (notif.user_id !== userId) return null;
     notif.read_at = readTimestamp;
     return notif;
   }
@@ -149,16 +184,18 @@ export async function markAllNotificationsAsRead(userId: string): Promise<boolea
 
   try {
     const supabase = await createClient();
-    await (supabase.from("notifications") as any)
+    const { error } = await (supabase.from("notifications") as any)
       .update({ read_at: readTimestamp })
       .eq("user_id", userId)
       .is("read_at", null);
-  } catch {
-    // Fallback
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    if (isSupabaseLive() || isProd()) throw err instanceof Error ? err : new Error("Service unavailable");
   }
 
+  // Offline demo fallback (dev/test only) — scope to caller
   DEMO_NOTIFICATIONS.forEach((n) => {
-    if (!n.read_at) n.read_at = readTimestamp;
+    if (n.user_id === userId && !n.read_at) n.read_at = readTimestamp;
   });
 
   return true;
@@ -172,6 +209,10 @@ export async function createNotification(params: {
   type: NotificationType;
   payload: NotificationPayload;
 }): Promise<NotificationItem> {
+  // Offline fast path: never hit the network without a linked backend.
+  if (!isSupabaseLive()) {
+    return createDemoNotification(params);
+  }
   try {
     const admin = createAdminClient();
     const { data, error } = await (admin.from("notifications") as any)
@@ -186,9 +227,19 @@ export async function createNotification(params: {
     if (!error && data) {
       return data as NotificationItem;
     }
-  } catch {
-    // Fallback in test/demo mode
+    throw new Error(error?.message || "Failed to create notification");
+  } catch (err) {
+    throw err instanceof Error ? err : new Error("Service unavailable");
   }
+}
+
+function createDemoNotification(params: {
+  userId: string;
+  type: NotificationType;
+  payload: NotificationPayload;
+}): NotificationItem {
+
+  // Offline demo fallback (dev/test only)
 
   const newNotif: NotificationItem = {
     id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,

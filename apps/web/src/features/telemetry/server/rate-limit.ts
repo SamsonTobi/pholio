@@ -9,6 +9,12 @@ export interface RateLimiterOptions {
   maxKeys?: number;
 }
 
+/**
+ * NOTE: single-instance in-memory limiter. On multi-instance deployments
+ * (Vercel/Cloudflare) each instance tracks its own counters, so a distributed
+ * attacker can multiply the effective limit by instance count. For strict
+ * global limits use a shared store (Redis/Upstash) keyed the same way.
+ */
 export class RateLimiter {
   private hits = new Map<string, number[]>();
   private limit: number;
@@ -76,10 +82,46 @@ export class RateLimiter {
 
 export const rateLimiter = new RateLimiter();
 
+// Stricter per-session throttle to cap a single tracker session even when
+// many sessions share one egress IP (NAT / mobile carriers).
+export const sessionRateLimiter = new RateLimiter({
+  limit: 30,
+  windowMs: 60_000,
+  maxKeys: 20_000,
+});
+
 export function checkRateLimit(ip: string, now?: number): RateLimitResult {
   return rateLimiter.check(ip, now);
 }
 
+export function checkSessionRateLimit(sessionHash: string, now?: number): RateLimitResult {
+  return sessionRateLimiter.check(`sess:${sessionHash}`, now);
+}
+
 export function resetRateLimit(): void {
   rateLimiter.reset();
+  sessionRateLimiter.reset();
+}
+
+/**
+ * Resolve the real client IP. Prefers the platform-provided IP
+ * (`request.ip` on Vercel / `cf-connecting-ip` on Cloudflare) then falls
+ * back through standard proxy headers to the first forwarded entry.
+ */
+export function getClientIp(request: {
+  ip?: string;
+  headers: { get(name: string): string | null };
+}): string {
+  const direct = request.ip?.trim();
+  if (direct) return direct;
+  const cf = request.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf.split(",")[0]!.trim();
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  return "127.0.0.1";
 }

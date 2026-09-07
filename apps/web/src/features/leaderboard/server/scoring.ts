@@ -39,6 +39,11 @@ export function computeRecencyBonus(
   const refTime = new Date(referenceDate).getTime();
   const diffMs = refTime - pushTime;
 
+  // Clamp future timestamps (clock drift / bad data) to no bonus.
+  if (diffMs < 0) {
+    return 0;
+  }
+
   // Handle recent pushes (including slight clock drift where diffMs <= 0)
   if (diffMs < MS_IN_24H) {
     return RECENCY_UNDER_24H;

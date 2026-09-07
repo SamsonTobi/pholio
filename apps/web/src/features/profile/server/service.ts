@@ -1,8 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 import { ProfileUpdateInput } from "./schema";
 import { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+
+function isSupabaseLive(): boolean {
+  return Boolean(
+    env.NEXT_PUBLIC_SUPABASE_URL &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
+      !env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") &&
+      !env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
+  );
+}
 
 // Fallback demo profile for local preview when DB is not linked
 const DEMO_PROFILES: Record<string, Profile> = {
@@ -64,7 +74,10 @@ export async function getBySlug(slug: string): Promise<{
     // Database connection fallback
   }
 
-  // Local demo fallback
+  // Local demo fallback (no linked backend only — never with live config)
+  if (isSupabaseLive()) {
+    return { profile: null };
+  }
   if (DEMO_PROFILES[slug]) {
     return { profile: DEMO_PROFILES[slug] };
   }
@@ -88,9 +101,10 @@ export async function getById(id: string): Promise<Profile | null> {
 
     if (data) return data;
   } catch {
-    // Fallback
+    // Fallback below (dev/test only)
   }
 
+  if (isSupabaseLive()) return null;
   return Object.values(DEMO_PROFILES).find((p) => p.id === id) || null;
 }
 
@@ -119,13 +133,35 @@ export async function changeSlug(id: string, newSlug: string): Promise<Profile |
     throw new Error("Slug is already taken");
   }
 
+  // Read current slug so the old one is preserved in slug_history in the
+  // same update (old URLs keep 301-redirecting via getBySlug).
+  const { data: current } = (await (supabase.from("profiles") as any)
+    .select("slug, slug_history")
+    .eq("id", id)
+    .maybeSingle()) as {
+    data: { slug: string; slug_history: string[] | null } | null;
+  };
+
+  if (!current) throw new Error("Profile not found");
+
+  const history = current.slug_history || [];
+  const nextHistory =
+    current.slug !== newSlug && !history.includes(current.slug)
+      ? [...history, current.slug]
+      : history;
+
   const { data, error } = (await (supabase.from("profiles") as any)
-    .update({ slug: newSlug })
+    .update({ slug: newSlug, slug_history: nextHistory })
     .eq("id", id)
     .select()
-    .single()) as { data: Profile | null; error: { message: string } | null };
+    .single()) as { data: Profile | null; error: { message: string; code?: string } | null };
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if ((error as { code?: string }).code === "23505" || error.message.includes("duplicate")) {
+      throw new Error("Slug is already taken");
+    }
+    throw new Error(error.message);
+  }
   return data;
 }
 

@@ -1,6 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 import { Database } from "@/lib/supabase/types";
 import { MockupDevice } from "./schema";
+
+function isSupabaseLive(): boolean {
+  return Boolean(
+    env.NEXT_PUBLIC_SUPABASE_URL &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
+      !env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") &&
+      !env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
+  );
+}
 
 export type Mockup = Database["public"]["Tables"]["mockups"]["Row"];
 
@@ -8,10 +18,10 @@ export const ALLOWED_MIME_TYPES = [
   "image/png",
   "image/jpeg",
   "image/webp",
-  "image/svg+xml",
 ] as const;
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+export const MAX_REORDER_ITEMS = 50;
 
 export interface UploadMockupParams {
   ownerId: string;
@@ -23,7 +33,11 @@ export interface UploadMockupParams {
   sort?: number;
 }
 
-export function validateMockupFile(mimeType: string, sizeInBytes: number): boolean {
+export function validateMockupFile(
+  mimeType: string,
+  sizeInBytes: number,
+  fileBuffer?: Buffer | Uint8Array
+): boolean {
   if (sizeInBytes > MAX_FILE_SIZE) {
     throw new Error(`File size exceeds 5MB limit (${sizeInBytes} bytes)`);
   }
@@ -32,7 +46,35 @@ export function validateMockupFile(mimeType: string, sizeInBytes: number): boole
     throw new Error(`Unsupported file type: ${mimeType}. Allowed: ${ALLOWED_MIME_TYPES.join(", ")}`);
   }
 
+  if (fileBuffer) {
+    const kind = sniffImageKind(fileBuffer);
+    const expected =
+      mimeType === "image/png" ? "png" : mimeType === "image/jpeg" ? "jpeg" : "webp";
+    if (kind !== expected) {
+      throw new Error(`File content does not match declared type ${mimeType}`);
+    }
+  }
+
   return true;
+}
+
+/** Sniff PNG/JPEG/WebP magic bytes. Returns null when unrecognized. */
+export function sniffImageKind(buf: Buffer | Uint8Array): "png" | "jpeg" | "webp" | null {
+  const b = buf instanceof Buffer ? buf : Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+    return "png";
+  }
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) {
+    return "jpeg";
+  }
+  if (
+    b.length >= 12 &&
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  ) {
+    return "webp";
+  }
+  return null;
 }
 
 export function sortMockups<T extends { sort: number; id: string }>(items: T[]): T[] {
@@ -58,9 +100,17 @@ export async function uploadMockup({
       ? fileBuffer.length
       : fileBuffer.byteLength;
 
-  validateMockupFile(mimeType, byteLength);
+  validateMockupFile(mimeType, byteLength, fileBuffer);
 
-  const supabase = await createClient();
+  // Offline fast path: uploads need a live backend (fail fast, don't hang).
+  if (!isSupabaseLive()) {
+    throw new Error("Service unavailable");
+  }
+
+  // Admin client: the project-ownership check below scopes this write to the
+  // caller's project (this path also serves cookieless MCP callers).
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const supabase = createAdminClient();
 
   const { data: project, error: projectError } = await (supabase.from("projects") as any)
     .select("id")
@@ -170,6 +220,10 @@ export async function reorderMockups({
   projectId: string;
   items: Array<{ id: string; sort: number }>;
 }): Promise<Mockup[]> {
+  if (items.length > MAX_REORDER_ITEMS) {
+    throw new Error(`Too many reorder items (max ${MAX_REORDER_ITEMS})`);
+  }
+
   const supabase = await createClient();
 
   const { data: project, error: projectError } = await (supabase.from("projects") as any)
@@ -223,7 +277,12 @@ export async function deleteMockup({
   }
 
   if (mockup.storage_path) {
-    await supabase.storage.from("mockups").remove([mockup.storage_path]);
+    const { error: removeError } = await supabase.storage
+      .from("mockups")
+      .remove([mockup.storage_path]);
+    if (removeError) {
+      throw new Error(`Storage delete failed: ${removeError.message}`);
+    }
   }
 
   const { error: deleteError } = await (supabase.from("mockups") as any)

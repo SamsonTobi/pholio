@@ -100,10 +100,16 @@ export function resolveProjectIcon(input: IconResolutionInput): ResolvedIcon {
     };
   }
 
-  // 6. Deterministic initial tile
+  // 6. Deterministic initial tile as an inline SVG data URI (no external
+  // dependency, works offline, safe to persist in icon_url).
   const hue = Math.round(deterministicHue(input.githubRepoId));
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96">` +
+    `<rect width="96" height="96" rx="20" fill="hsl(${hue},70%,50%)"/>` +
+    `<text x="48" y="62" font-family="system-ui,sans-serif" font-size="44" font-weight="700" fill="#fff" text-anchor="middle">?</text>` +
+    `</svg>`;
   return {
     source: "initial_tile",
-    url: `https://api.dicebear.com/7.x/initials/svg?seed=${input.githubRepoId}&backgroundColor=hsl(${hue},70%,50%)`,
+    url: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
   };
 }

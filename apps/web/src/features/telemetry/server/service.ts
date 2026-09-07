@@ -23,6 +23,8 @@ export interface StatsTotals {
 export interface StatsResult {
   days: DayStat[];
   totals: StatsTotals;
+  /** True when the numbers are local demo data, never real analytics. */
+  demo?: boolean;
 }
 
 export interface GetStatsInput {
@@ -112,27 +114,20 @@ export async function ingestEvent(input: IngestEventInput): Promise<boolean> {
   }
 
   if (isSupabaseLive()) {
-    try {
-      const supabase = createAdminClient();
-      const { error } = await (supabase.from("raw_events") as any).insert({
-        telemetry_slug: telemetrySlug,
-        session_hash: sessionHash,
-        path,
-      });
+    const supabase = createAdminClient();
+    const { error } = await (supabase.from("raw_events") as any).insert({
+      telemetry_slug: telemetrySlug,
+      session_hash: sessionHash,
+      path,
+    });
 
-      if (error) {
-        mockRawEvents.push({ telemetrySlug, sessionHash, path, ts: new Date() });
-      } else {
-        mockRawEvents.push({ telemetrySlug, sessionHash, path, ts: new Date() });
-      }
-      return true;
-    } catch {
-      mockRawEvents.push({ telemetrySlug, sessionHash, path, ts: new Date() });
-      return true;
+    if (error) {
+      throw new Error(`ingest failed: ${error.message}`);
     }
+    return true;
   }
 
-  // Fallback mock when Supabase is not configured
+  // Local-only fallback when Supabase is not configured (dev/test).
   mockRawEvents.push({ telemetrySlug, sessionHash, path, ts: new Date() });
   return true;
 }
@@ -181,28 +176,28 @@ export async function getStats({
               visitors_7d,
               actives_7d,
             },
+            demo: false,
           };
         }
       }
     } catch {
-      // Fallback on error
+      // Database error with live backend: fall through to honest empty result.
     }
+
+    // Live backend but no rows for this project: honest empty result.
+    return { days: [], totals: { visitors_7d: 0, actives_7d: 0 }, demo: false };
   }
 
-  // Deterministic fallback when database is offline or empty
-  return generateDeterministicStats(projectSlug, clampedDays);
+  // Deterministic demo data when database is offline (dev/test only).
+  return { ...generateDeterministicStats(projectSlug, clampedDays), demo: true };
 }
 
 export async function hasEvents(telemetrySlug: string): Promise<boolean> {
   if (!telemetrySlug) return false;
 
-  // Check in-memory fallback events first
-  if (mockRawEvents.some((e) => e.telemetrySlug === telemetrySlug)) {
-    return true;
-  }
-
-  // Built-in demo showcase projects
-  if (["pholio-demo", "bankroll-demo"].includes(telemetrySlug)) {
+  // In-memory events are a dev/test offline-mode store only — never consult
+  // them when a live backend is configured.
+  if (!isSupabaseLive() && mockRawEvents.some((e) => e.telemetrySlug === telemetrySlug)) {
     return true;
   }
 

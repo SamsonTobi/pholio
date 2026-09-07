@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { NEXT_PUBLIC_TRACKER_URL } from "@/lib/env";
+import React, { useState, useId } from "react";
+import { TRACKER_URL } from "@/lib/env";
 import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -16,8 +16,11 @@ export function TelemetrySnippetTab({
 }: TelemetrySnippetTabProps) {
   const [activeTab, setActiveTab] = useState<"html" | "nextjs">("html");
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const htmlTabId = useId();
+  const nextjsTabId = useId();
 
-  const trackerUrl = NEXT_PUBLIC_TRACKER_URL || "http://localhost:3000/tracker.js";
+  const trackerUrl = TRACKER_URL;
 
   const htmlSnippet = `<script defer data-project="${telemetrySlug}" src="${trackerUrl}"></script>`;
   const nextjsSnippet = `<Script defer data-project="${telemetrySlug}" src="${trackerUrl}" />`;
@@ -26,12 +29,12 @@ export function TelemetrySnippetTab({
 
   const handleCopy = async () => {
     try {
+      setCopyError(null);
       await navigator.clipboard.writeText(currentSnippet);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyError("Copy failed. Select the snippet manually to copy.");
     }
   };
 
@@ -39,9 +42,16 @@ export function TelemetrySnippetTab({
     <div className="space-y-4">
       {/* Header with Tab Switch and Status Badge */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-100 p-1 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+        <div
+          role="tablist"
+          aria-label="Snippet format"
+          className="inline-flex h-9 items-center justify-center rounded-lg bg-neutral-100 p-1 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+        >
           <button
             type="button"
+            role="tab"
+            id={htmlTabId}
+            aria-selected={activeTab === "html"}
             onClick={() => setActiveTab("html")}
             className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all ${
               activeTab === "html"
@@ -53,6 +63,9 @@ export function TelemetrySnippetTab({
           </button>
           <button
             type="button"
+            role="tab"
+            id={nextjsTabId}
+            aria-selected={activeTab === "nextjs"}
             onClick={() => setActiveTab("nextjs")}
             className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-all ${
               activeTab === "nextjs"
@@ -90,6 +103,7 @@ export function TelemetrySnippetTab({
           variant="secondary"
           size="sm"
           onClick={handleCopy}
+          aria-label="Copy tracking snippet"
           className="absolute top-2.5 right-2.5 h-7 text-xs bg-neutral-800 text-neutral-200 hover:bg-neutral-700 hover:text-white"
         >
           {copied ? (
@@ -110,6 +124,11 @@ export function TelemetrySnippetTab({
       <p className="text-xs text-neutral-500 dark:text-neutral-400">
         No cookies. No fingerprinting. Counts only.
       </p>
+      {copyError && (
+        <div role="alert" className="text-xs text-red-600 dark:text-red-400">
+          {copyError}
+        </div>
+      )}
     </div>
   );
 }
