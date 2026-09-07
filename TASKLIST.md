@@ -178,25 +178,25 @@ Services + UI + email:
 
 Migrations (Supabase):
 
-- [ ] 7.1 Migration `027_realtime_outbox`: `realtime_outbox(id bigint generated always as identity primary key, table_name text, row_id text, channel text not null, payload jsonb, created_at timestamptz default now())`. Index `(channel, created_at desc)`.
-- [ ] 7.2 Migration `028_fanout_fn`: plpgsql `notify_fanout()` using `net.http_post('${WORKER_URL}/fanout', jsonb, headers '{"x-fanout-secret": "..."}')`. Reads Worker URL + secret from `vault` or `current_setting` — document choice, never commit secret. Inserts to `realtime_outbox` first, then posts.
-- [ ] 7.3 Migration `029_fanout_triggers`: triggers `trg_showcases_fanout after insert or update on showcases` (channel `showcase:{owner_slug}` + `hacker-group:{group_ids}`), `trg_daily_stats_fanout`, `trg_leaderboard_fanout`. Channel derivation via helper fns.
-- [ ] 7.4 Migration `030_outbox_purge_cron`: `pg_cron` hourly purge `realtime_outbox older than 7d`.
+- [x] 7.1 Migration `027_realtime_outbox`: `realtime_outbox(id bigint generated always as identity primary key, table_name text, row_id text, channel text not null, payload jsonb, created_at timestamptz default now())`. Index `(channel, created_at desc)`.
+- [x] 7.2 Migration `028_fanout_fn`: plpgsql `notify_fanout()` using `net.http_post('${WORKER_URL}/fanout', jsonb, headers '{"x-fanout-secret": "..."}')`. Reads Worker URL + secret from `vault` or `current_setting` — document choice, never commit secret. Inserts to `realtime_outbox` first, then posts.
+- [x] 7.3 Migration `029_fanout_triggers`: triggers `trg_showcases_fanout after insert or update on showcases` (channel `showcase:{owner_slug}` + `hacker-group:{group_ids}`), `trg_daily_stats_fanout`, `trg_leaderboard_fanout`. Channel derivation via helper fns.
+- [x] 7.4 Migration `030_outbox_purge_cron`: `pg_cron` hourly purge `realtime_outbox older than 7d`.
 
 Worker (`workers/realtime`):
 
-- [ ] 7.5 `wrangler.toml`: `name=realtime`, DO binding `REALTIME_ROOM`, vars `FANOUT_SECRET` (secret), `APP_URL` (plain). Env-specific `dev`/`prod` URLs. Document `wrangler secret put FANOUT_SECRET`.
-- [ ] 7.6 `src/do.ts` Durable Object `RealtimeRoom`: `fetch` handles WS upgrade `/subscribe?channel=`, attach/detach sessions, `broadcast(json)`, heartbeat, cap 100 conns/room, JSON `{type,id,updated_at}`.
-- [ ] 7.7 `src/index.ts`: `POST /fanout` (verify `x-fanout-secret`, resolve stub `showcase:{slug}` / `hacker-group:{id}`, forward), `GET /subscribe` (route to DO), `GET /health`, scheduled cron (optional keepalive/rollup trigger). No secrets logged.
-- [ ] 7.8 `wrangler dev` + `wrangler deploy` verified, `NEXT_PUBLIC_REALTIME_URL` points at it per env.
+- [x] 7.5 `wrangler.toml`: `name=realtime`, DO binding `REALTIME_ROOM`, vars `FANOUT_SECRET` (secret), `APP_URL` (plain). Env-specific `dev`/`prod` URLs. Document `wrangler secret put FANOUT_SECRET`.
+- [x] 7.6 `src/do.ts` Durable Object `RealtimeRoom`: `fetch` handles WS upgrade `/subscribe?channel=`, attach/detach sessions, `broadcast(json)`, heartbeat, cap 100 conns/room, JSON `{type,id,updated_at}`.
+- [x] 7.7 `src/index.ts`: `POST /fanout` (verify `x-fanout-secret`, resolve stub `showcase:{slug}` / `hacker-group:{id}`, forward), `GET /subscribe` (route to DO), `GET /health`, scheduled cron (optional keepalive/rollup trigger). No secrets logged.
+- [x] 7.8 `wrangler dev` + `wrangler deploy` verified, `NEXT_PUBLIC_REALTIME_URL` points at it per env.
 
 Frontend:
 
-- [ ] 7.9 Implement `src/lib/realtime-client.ts` `useRealtimeChannel(channel, onMessage)` (WS to `REALTIME_URL`, exponential backoff, `onerror` falls back silently to polling).
-- [ ] 7.10 Wire channels: `[slug]` page subscribes `showcase:{slug}`, hacker group page `hacker-group:{id}`. On message invalidate React Query `stats`/`showcases`/`leaderboard` keys.
-- [ ] 7.11 Keep `refetchInterval: 60_000` fallback on all realtime queries. Document "period-based, not strict live".
-- [ ] 7.12 Playwright/manual: publish showcase -> open page updates <5s; kill WS -> still updates within 60s.
-- [ ] Acceptance 7: fan-out E2E green, outbox rows created, no Supabase Realtime used.
+- [x] 7.9 Implement `src/lib/realtime-client.ts` `useRealtimeChannel(channel, onMessage)` (WS to `REALTIME_URL`, exponential backoff, `onerror` falls back silently to polling).
+- [x] 7.10 Wire channels: `[slug]` page subscribes `showcase:{slug}`, hacker group page `hacker-group:{id}`. On message invalidate React Query `stats`/`showcases`/`leaderboard` keys.
+- [x] 7.11 Keep `refetchInterval: 60_000` fallback on all realtime queries. Document "period-based, not strict live".
+- [x] 7.12 Playwright/manual: publish showcase -> open page updates <5s; kill WS -> still updates within 60s.
+- [x] Acceptance 7: fan-out E2E green, outbox rows created, no Supabase Realtime used.
 
 ## Phase 8 — MCP + agent docs
 

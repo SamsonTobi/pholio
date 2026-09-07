@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TimeAgo } from "@/components/shared/TimeAgo";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useRealtimeChannel } from "@/lib/realtime-client";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -133,7 +134,15 @@ export default function HackerGroupDetailPage() {
 
   React.useEffect(() => {
     fetchGroupData();
+    // Period-based fallback polling (refetchInterval: 60_000)
+    const interval = setInterval(fetchGroupData, 60000);
+    return () => clearInterval(interval);
   }, [fetchGroupData]);
+
+  // Live realtime updates via Cloudflare Worker Durable Object channel
+  useRealtimeChannel(group?.id ? `hacker-group:${group.id}` : null, () => {
+    fetchGroupData();
+  });
 
   const handleCopyInvite = async () => {
     if (!group) return;

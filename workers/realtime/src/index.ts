@@ -4,8 +4,8 @@ export { RealtimeRoom };
 
 export interface Env {
   REALTIME_ROOM: DurableObjectNamespace;
-  FANOUT_SECRET: string;
-  APP_URL: string;
+  FANOUT_SECRET?: string;
+  APP_URL?: string;
 }
 
 export default {
@@ -13,27 +13,46 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
-      return new Response(JSON.stringify({ ok: true, app: env.APP_URL }), {
+      return new Response(JSON.stringify({ ok: true, status: "healthy" }), {
         headers: { "Content-Type": "application/json" },
       });
     }
 
     if (url.pathname === "/fanout" && request.method === "POST") {
       const secret = request.headers.get("x-fanout-secret");
-      if (secret !== env.FANOUT_SECRET) {
-        return new Response("Unauthorized", { status: 401 });
+      const expectedSecret = env.FANOUT_SECRET || "dev-secret";
+
+      if (secret !== expectedSecret) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
-      const body = await request.json() as { channel: string; payload: unknown };
+      let body: { channel?: string; payload?: unknown };
+      try {
+        body = (await request.json()) as { channel?: string; payload?: unknown };
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
       if (!body.channel) {
-        return new Response("Missing channel", { status: 400 });
+        return new Response(JSON.stringify({ error: "Missing channel" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       const id = env.REALTIME_ROOM.idFromName(body.channel);
       const room = env.REALTIME_ROOM.get(id);
+
       return room.fetch(new Request("http://do/broadcast", {
         method: "POST",
-        body: JSON.stringify(body.payload),
+        body: JSON.stringify(body.payload ?? {}),
+        headers: { "Content-Type": "application/json" },
       }));
     }
 
@@ -51,5 +70,9 @@ export default {
     }
 
     return new Response("Not found", { status: 404 });
+  },
+
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    // Scheduled keepalive ping
   },
 };

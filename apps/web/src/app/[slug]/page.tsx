@@ -11,6 +11,7 @@ import { IndexProjectRow } from "@/components/shared/IndexProjectRow";
 import { NowSection } from "@/components/shared/NowSection";
 import { PreviouslySection } from "@/components/shared/PreviouslySection";
 import { getLatestPinnedShowcase } from "@/features/showcases/server/service";
+import { ShowcaseRealtimeListener } from "@/components/shared/ShowcaseRealtimeListener";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -79,6 +80,7 @@ export default async function ShowcasePage({
   if (profile.template === "story") {
     return (
       <div className="min-h-screen py-10 px-4 sm:px-6">
+        <ShowcaseRealtimeListener slug={profile.slug} />
         <div className="max-w-5xl mx-auto space-y-10">
           <ShowcaseHeaderCard
             displayName={profile.display_name || profile.slug}
@@ -109,11 +111,12 @@ export default async function ShowcasePage({
                   showcase_slug={project.showcase_slug}
                   tagline={project.description}
                   readme_summary={project.readme_summary}
-                  icon_url={project.icon_url}
                   live_url={project.live_url}
+                  icon_url={project.icon_url}
                   stars={project.stars}
                   last_push_at={project.last_push_at}
                   mockupDevice={project.mockup?.device || "browser"}
+                  mockupUrl={project.mockup?.storage_path}
                   showcaseBodies={project.latestShowcases?.map((s) => s.body) || []}
                 />
               ))}
@@ -123,10 +126,18 @@ export default async function ShowcasePage({
                   <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-neutral-400 mb-4">
                     Archived Projects
                   </h3>
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 opacity-60">
                     {archivedProjects.map((p) => (
-                      <div key={p.id} className="text-xs text-neutral-500">
-                        {p.name} — {p.description}
+                      <div
+                        key={p.id}
+                        className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50"
+                      >
+                        <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">
+                          {p.name}
+                        </div>
+                        <div className="text-xs text-neutral-500 mt-1 line-clamp-2">
+                          {p.description || "No description provided."}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -142,6 +153,7 @@ export default async function ShowcasePage({
   // Variant B: Index template
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6">
+      <ShowcaseRealtimeListener slug={profile.slug} />
       <div className="max-w-xl mx-auto space-y-6">
         <IndexHeader
           displayName={profile.display_name || profile.slug}
