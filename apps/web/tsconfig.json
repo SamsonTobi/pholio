@@ -20,7 +20,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@pholio/shared": ["../../packages/shared/src/index.ts"]
+      "@pholio/shared": ["../../packages/shared/src/index.ts"],
+      "@pholio/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
