@@ -187,30 +187,32 @@ export async function generateApiKey({
 
 /**
  * Lists all API keys belonging to a user (excludes secrets).
+ *
+ * When Supabase is live, database errors are thrown so callers see a
+ * failure instead of a misleading empty list. The in-memory store is
+ * only used for local development without Supabase credentials.
  */
 export async function listApiKeys(userId: string): Promise<ApiKeyItem[]> {
   if (isSupabaseLive()) {
-    try {
-      const admin = createAdminClient();
-      const { data, error } = await (admin.from("api_keys") as any)
-        .select("id, name, prefix, scopes, created_at, revoked_at, last_used_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+    const admin = createAdminClient();
+    const { data, error } = await (admin.from("api_keys") as any)
+      .select("id, name, prefix, scopes, created_at, revoked_at, last_used_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
 
-      if (!error && Array.isArray(data)) {
-        return data.map((k: any) => ({
-          id: k.id,
-          name: k.name,
-          prefix: k.prefix,
-          scopes: k.scopes || [],
-          created_at: k.created_at,
-          revoked_at: k.revoked_at,
-          last_used_at: k.last_used_at ?? null,
-        }));
-      }
-    } catch {
-      // Fallback
+    if (error) {
+      throw new Error(`Failed to list API keys: ${error.message}`);
     }
+
+    return (data ?? []).map((k: any) => ({
+      id: k.id,
+      name: k.name,
+      prefix: k.prefix,
+      scopes: k.scopes || [],
+      created_at: k.created_at,
+      revoked_at: k.revoked_at,
+      last_used_at: k.last_used_at ?? null,
+    }));
   }
 
   return Array.from(inMemoryApiKeys.values())
