@@ -46,6 +46,7 @@ interface ProjectData {
   tags: string[];
   live_url: string | null;
   status: "active" | "archived";
+  show_on_showcase: boolean;
   telemetry_slug: string;
   owner_id: string;
 }
@@ -67,6 +68,7 @@ export default function ProjectEditorPage() {
   const [tagInput, setTagInput] = useState("");
   const [liveUrl, setLiveUrl] = useState("");
   const [status, setStatus] = useState<"active" | "archived">("active");
+  const [showOnShowcase, setShowOnShowcase] = useState(true);
   const [mockups, setMockups] = useState<MockupItem[]>([]);
 
   const [saving, setSaving] = useState(false);
@@ -113,6 +115,7 @@ export default function ProjectEditorPage() {
           setTags(p.tags || []);
           setLiveUrl(p.live_url || "");
           setStatus(p.status || "active");
+          setShowOnShowcase(p.show_on_showcase ?? true);
         }
         if (mockupsRes.ok && !cancelled) {
           const mockupsData = await mockupsRes.json();
@@ -323,6 +326,7 @@ export default function ProjectEditorPage() {
           tags,
           live_url: liveUrl.trim() || null,
           status,
+          show_on_showcase: showOnShowcase,
         }),
       });
       if (!res.ok) {
@@ -536,6 +540,46 @@ export default function ProjectEditorPage() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Tagline / Short description */}
+            <div className="space-y-1.5">
+              <span id="visibility-label" className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                Showcase visibility
+              </span>
+              <div
+                role="group"
+                aria-labelledby="visibility-label"
+                className="grid grid-cols-2 gap-1 p-1 bg-neutral-100 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 max-w-xs"
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowOnShowcase(true)}
+                  aria-pressed={showOnShowcase}
+                  className={`py-1.5 text-xs font-medium rounded-md transition-all ${
+                    showOnShowcase
+                      ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-neutral-50 shadow-xs"
+                      : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950"
+                  }`}
+                >
+                  Shown
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOnShowcase(false)}
+                  aria-pressed={!showOnShowcase}
+                  className={`py-1.5 text-xs font-medium rounded-md transition-all ${
+                    !showOnShowcase
+                      ? "bg-white dark:bg-neutral-900 text-neutral-950 dark:text-neutral-50 shadow-xs"
+                      : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-950"
+                  }`}
+                >
+                  Hidden
+                </button>
+              </div>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                Hidden projects stay in your dashboard but don&apos;t appear on your public showcase.
+              </p>
             </div>
 
             {/* Tagline / Short description */}

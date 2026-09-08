@@ -63,6 +63,7 @@ export async function listProjectsByOwner(ownerId: string): Promise<EnrichedProj
       stars: 142,
       live_url: "https://pholio.cc",
       status: "active",
+      show_on_showcase: true,
       last_push_at: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
       telemetry_slug: "pholio-demo",
       created_at: new Date().toISOString(),
@@ -100,6 +101,7 @@ export async function listProjectsByOwner(ownerId: string): Promise<EnrichedProj
       stars: 88,
       live_url: "https://bankroll.ng",
       status: "active",
+      show_on_showcase: true,
       last_push_at: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
       telemetry_slug: "bankroll-demo",
       created_at: new Date().toISOString(),
@@ -199,6 +201,7 @@ export async function updateProject(
     "tags",
     "live_url",
     "status",
+    "show_on_showcase",
   ]);
   const safeUpdates: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(updates)) {

@@ -75,11 +75,11 @@ begin
       if suffix > 100 then
         raise warning 'handle_new_user: could not allocate slug for user %', NEW.id;
         return NEW;
-      end;
+      end if;
     end;
   end loop slug_loop;
 
   return NEW;
 end;
 $$ language plpgsql security definer
-set search_path = public, pg_temp;
+set search_path = public;

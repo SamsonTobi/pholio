@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StatusPill } from "@/components/shared/StatusPill";
 import { TimeAgo } from "@/components/shared/TimeAgo";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ShowcaseSection } from "@/features/showcases/components/ShowcaseSection";
 import {
   Search,
   Pencil,
@@ -22,6 +23,8 @@ import {
   Code2,
   CheckCircle2,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface ProjectItem {
@@ -36,6 +39,7 @@ interface ProjectItem {
   stars: number;
   live_url: string | null;
   status: "active" | "archived";
+  show_on_showcase: boolean;
   last_push_at: string | null;
   telemetry_slug: string;
   owner_id: string;
@@ -52,6 +56,7 @@ export default function ProjectsDashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [resyncedId, setResyncedId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -141,6 +146,45 @@ export default function ProjectsDashboardPage() {
     }
   };
 
+  const handleToggleVisibility = async (project: ProjectItem) => {
+    const next = !(project.show_on_showcase ?? true);
+    setTogglingId(project.id);
+    setActionError(null);
+    setProjects((cur) =>
+      cur.map((p) =>
+        p.id === project.id ? { ...p, show_on_showcase: next } : p
+      )
+    );
+    try {
+      const res = await fetch(
+        `/api/projects?id=${encodeURIComponent(project.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ show_on_showcase: next }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to update visibility.");
+      }
+      router.refresh();
+    } catch (err) {
+      setProjects((cur) =>
+        cur.map((p) =>
+          p.id === project.id
+            ? { ...p, show_on_showcase: project.show_on_showcase }
+            : p
+        )
+      );
+      setActionError(
+        err instanceof Error ? err.message : "Visibility update failed."
+      );
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
       if (statusFilter !== "all" && project.status !== statusFilter) {
@@ -202,7 +246,7 @@ export default function ProjectsDashboardPage() {
             Projects
           </h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Manage your project showcases, mockups, and GitHub sync status.
+            Manage your projects, showcase updates, and GitHub sync status.
           </p>
         </div>
 
@@ -372,6 +416,13 @@ export default function ProjectsDashboardPage() {
 
                           <StatusPill status={project.status} />
 
+                          {(project.show_on_showcase ?? true) === false && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+                              <EyeOff className="h-2.5 w-2.5" aria-hidden="true" />
+                              Hidden
+                            </span>
+                          )}
+
                           {resyncedId === project.id && (
                             <span className="inline-flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400 font-medium">
                               <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> Resynced
@@ -457,6 +508,32 @@ export default function ProjectsDashboardPage() {
                         {syncingId === project.id ? "Syncing..." : "Resync"}
                       </Button>
 
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleVisibility(project)}
+                        disabled={togglingId === project.id}
+                        aria-pressed={(project.show_on_showcase ?? true) === false}
+                        aria-label={
+                          (project.show_on_showcase ?? true) === false
+                            ? `Show ${project.name} on showcase`
+                            : `Hide ${project.name} from showcase`
+                        }
+                        className="h-8 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      >
+                        {(project.show_on_showcase ?? true) === false ? (
+                          <>
+                            <Eye className="h-3.5 w-3.5 mr-1 text-neutral-500" aria-hidden="true" />
+                            Show
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="h-3.5 w-3.5 mr-1 text-neutral-500" aria-hidden="true" />
+                            Hide
+                          </>
+                        )}
+                      </Button>
+
                       {href && (
                         <Link href={href} target="_blank">
                           <Button
@@ -478,6 +555,8 @@ export default function ProjectsDashboardPage() {
           })}
         </div>
       )}
+
+      <ShowcaseSection />
     </div>
   );
 }

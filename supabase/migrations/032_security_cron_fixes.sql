@@ -495,7 +495,10 @@ $$;
 --       app.settings.app_url, app.settings.cron_secret,
 --       app.settings.realtime_worker_url, app.settings.fanout_secret
 -- ============================================================================
-do $$
+-- NOTE: outer tag is $cron$ (not $$) because the cron command strings below
+-- contain their own $$-quoted DO blocks; nesting the same tag is a syntax
+-- error since the first inner $$ would terminate the outer body.
+do $cron$
 declare
   v_cron text;
   v_net text;
@@ -569,12 +572,12 @@ begin
   -- Both commands no-op with a notice when app_url/cron_secret are unset.
   if v_has_http then
     v_leaderboard_cmd :=
-      'do $$ begin if nullif(current_setting(''app.settings.app_url'', true), '''') is null then ' ||
+      'do $inner$ begin if nullif(current_setting(''app.settings.app_url'', true), '''') is null then ' ||
       'raise notice ''leaderboard-daily: app.settings.app_url unset, skipping''; return; end if; ' ||
       'perform ' || quote_ident(v_net) || '.http_post(' ||
       'url := current_setting(''app.settings.app_url'', true) || ''/api/cron/leaderboard'', ' ||
       'headers := jsonb_build_object(''Content-Type'', ''application/json'', ' ||
-      '''Authorization'', ''Bearer '' || current_setting(''app.settings.cron_secret'', true))); end $$;';
+      '''Authorization'', ''Bearer '' || current_setting(''app.settings.cron_secret'', true))); end $inner$;';
 
     begin
       execute format('select %I.unschedule(jobid) from %I.job where jobname = %L', v_cron, v_cron, 'leaderboard-daily');
@@ -585,12 +588,12 @@ begin
     end;
 
     v_resync_cmd :=
-      'do $$ begin if nullif(current_setting(''app.settings.app_url'', true), '''') is null then ' ||
+      'do $inner$ begin if nullif(current_setting(''app.settings.app_url'', true), '''') is null then ' ||
       'raise notice ''github-resync-daily: app.settings.app_url unset, skipping''; return; end if; ' ||
       'perform ' || quote_ident(v_net) || '.http_post(' ||
       'url := current_setting(''app.settings.app_url'', true) || ''/api/cron/resync'', ' ||
       'headers := jsonb_build_object(''Content-Type'', ''application/json'', ' ||
-      '''Authorization'', ''Bearer '' || current_setting(''app.settings.cron_secret'', true))); end $$;';
+      '''Authorization'', ''Bearer '' || current_setting(''app.settings.cron_secret'', true))); end $inner$;';
 
     begin
       execute format('select %I.unschedule(jobid) from %I.job where jobname = %L', v_cron, v_cron, 'github-resync-daily');
@@ -600,4 +603,4 @@ begin
       raise warning '032: github-resync-daily schedule failed (%)', sqlerrm;
     end;
   end if;
-end $$;
+end $cron$;

@@ -26,25 +26,19 @@ export default function MarketingPage() {
           Used by 300+ builders
         </div>
 
-        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-neutral-950 dark:text-neutral-50 max-w-3xl mb-6">
-          Self-maintaining showcase for product builders
+        <h1 className="text-4xl sm:text-6xl font-medium tracking-tighter text-primary dark:text-neutral-50 max-w-3xl mb-10">
+          Your portfolio, connected directly to your codebase.
         </h1>
 
-        <p className="text-lg sm:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mb-10 leading-relaxed">
-          Connect GitHub once. Pholio builds your showcase, tracks visitors, and stays updated from your pushes — or straight from your coding agent.
+        <p className="text-sm sm:text-lg text-primary dark:text-neutral-400 max-w-xl mb-10 leading-relaxed">
+          Connect GitHub once. Pholio connects your coding agent to your public showcase, so shipping and showcasing happen together.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <Link href="/login">
             <Button size="lg" className="w-full sm:w-auto gap-2">
-              <GithubIcon className="h-4 w-4" />
-              Join Pholio
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href="/login">
-            <Button variant="outline" size="lg" className="w-full sm:w-auto">
-              Login
+              <GithubIcon className="h-8 w-8" />
+              Sign in with GitHub
             </Button>
           </Link>
         </div>

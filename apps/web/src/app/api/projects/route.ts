@@ -44,6 +44,7 @@ export async function PATCH(request: NextRequest) {
       "tags",
       "live_url",
       "status",
+      "show_on_showcase",
     ] as const) {
       if (key in json) allowed[key] = json[key];
     }

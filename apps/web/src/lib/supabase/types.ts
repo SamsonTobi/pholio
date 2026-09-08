@@ -70,6 +70,7 @@ export type Database = {
           stars: number;
           live_url: string | null;
           status: "active" | "archived";
+          show_on_showcase: boolean;
           last_push_at: string | null;
           telemetry_slug: string;
           created_at: string;
@@ -89,6 +90,7 @@ export type Database = {
           stars?: number;
           live_url?: string | null;
           status?: "active" | "archived";
+          show_on_showcase?: boolean;
           last_push_at?: string | null;
           telemetry_slug: string;
           created_at?: string;
@@ -108,6 +110,7 @@ export type Database = {
           stars?: number;
           live_url?: string | null;
           status?: "active" | "archived";
+          show_on_showcase?: boolean;
           last_push_at?: string | null;
           telemetry_slug?: string;
           created_at?: string;

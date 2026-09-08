@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useId } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { APP_URL } from "@/lib/env";
-import { ArrowRight, Key, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ApiKeysSection } from "@/features/agent-keys/components/ApiKeysSection";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -328,28 +328,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Key className="h-4 w-4 text-neutral-700 dark:text-neutral-300" aria-hidden="true" />
-              <CardTitle>Agent API Keys</CardTitle>
-            </div>
-            <CardDescription>
-              Empower AI coding agents (Claude, Cursor, Copilot, Antigravity) to update your showcase automatically via MCP.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Generate and manage API keys for automated showcase updates and project synchronizations.
-            </p>
-            <Link href="/dashboard/api-keys">
-              <Button type="button" variant="outline" size="sm" className="gap-1.5 shrink-0">
-                Manage Agent API Keys
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <ApiKeysSection />
 
         <div className="flex items-center justify-end gap-3">
           <Button type="submit" disabled={saving}>

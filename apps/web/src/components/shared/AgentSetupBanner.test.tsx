@@ -23,4 +23,19 @@ describe("AgentSetupBanner", () => {
     expect(prompt).toContain("WAIT for my approval");
     expect(prompt).toContain("Never update or publish anything");
   });
+
+  it("embeds github repo links when projects exist locally or not", () => {
+    const prompt = buildAgentSetupPrompt({
+      token: "pholio_live_abc123_secret",
+      appUrl: "https://pholio.cc",
+      repos: [
+        { slug: "pholio", githubUrl: "https://github.com/SamsonTobi/pholio" },
+        { slug: "mayra", githubUrl: "https://github.com/SamsonTobi/mayra" },
+      ],
+    });
+    expect(prompt).toContain("Your projects on GitHub:");
+    expect(prompt).toContain("- pholio: https://github.com/SamsonTobi/pholio");
+    expect(prompt).toContain("- mayra: https://github.com/SamsonTobi/mayra");
+    expect(prompt).toContain("its GitHub URL above when it isn't local");
+  });
 });

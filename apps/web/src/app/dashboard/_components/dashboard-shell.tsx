@@ -18,9 +18,7 @@ export function DashboardShell({
 
   const navItems = [
     { label: "Projects", href: "/dashboard/projects" },
-    { label: "Showcases", href: "/dashboard/showcases" },
     { label: "Hacker Groups", href: "/dashboard/hacker-groups" },
-    { label: "API Keys", href: "/dashboard/api-keys" },
     { label: "Settings", href: "/dashboard/settings" },
   ];
 
@@ -45,9 +43,7 @@ export function DashboardShell({
                   (item.href === "/dashboard/projects" &&
                     pathname.startsWith("/dashboard/projects")) ||
                   (item.href === "/dashboard/hacker-groups" &&
-                    pathname.startsWith("/dashboard/hacker-groups")) ||
-                  (item.href === "/dashboard/api-keys" &&
-                    pathname.startsWith("/dashboard/api-keys"));
+                    pathname.startsWith("/dashboard/hacker-groups"));
                 return (
                   <Link
                     key={item.href}

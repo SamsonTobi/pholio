@@ -81,7 +81,7 @@ export function IndexTabs({
             variant="outline"
             size="sm"
             className="h-7 text-xs gap-1 px-2.5"
-            onClick={() => router.push("/dashboard/showcases")}
+            onClick={() => router.push("/dashboard/projects")}
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             Compose

@@ -131,10 +131,28 @@ export default async function ShowcasePage({
     avatarUrl: (sessionUser?.user_metadata?.avatar_url as string | undefined) ?? null,
     showcaseHref: isOwner ? `/${profile.slug}` : null,
   };
-  const activeProjects = projects.filter((p) => p.status !== "archived");
+  const activeProjects = projects.filter(
+    (p) => p.status !== "archived" && p.show_on_showcase !== false
+  );
   const archivedProjects = projects.filter((p) => p.status === "archived");
+  const agentRepos = activeProjects.flatMap((p) =>
+    p.github_full_name
+      ? [{ slug: p.showcase_slug, githubUrl: `https://github.com/${p.github_full_name}` }]
+      : []
+  );
 
-  const latestShowcase = pinnedShowcase || projects.flatMap((p) => p.latestShowcases || [])[0];
+  const hiddenIds = new Set(
+    projects.filter((p) => p.show_on_showcase === false).map((p) => p.id)
+  );
+  const visiblePinnedShowcase =
+    pinnedShowcase && !hiddenIds.has(pinnedShowcase.project_id)
+      ? pinnedShowcase
+      : null;
+  const latestShowcase =
+    visiblePinnedShowcase ||
+    projects
+      .filter((p) => p.show_on_showcase !== false)
+      .flatMap((p) => p.latestShowcases || [])[0];
   const joinedDate = formatJoinedDate(profile.created_at);
 
   // Variant A: Story template
@@ -145,7 +163,7 @@ export default async function ShowcasePage({
       <div className="py-10 px-4 sm:px-6">
         <ShowcaseRealtimeListener slug={profile.slug} />
         <div className="max-w-5xl mx-auto space-y-10">
-          {showAgentBanner && <AgentSetupBanner appUrl={APP_URL} />}
+          {showAgentBanner && <AgentSetupBanner appUrl={APP_URL} repos={agentRepos} />}
           <ShowcaseHeaderCard
             displayName={profile.display_name || profile.slug}
             headline={profile.headline}
@@ -225,7 +243,7 @@ export default async function ShowcasePage({
       <div className="py-10 px-4 sm:px-6">
         <ShowcaseRealtimeListener slug={profile.slug} />
         <div className="max-w-xl mx-auto space-y-6">
-          {showAgentBanner && <AgentSetupBanner appUrl={APP_URL} />}
+          {showAgentBanner && <AgentSetupBanner appUrl={APP_URL} repos={agentRepos} />}
           <IndexHeader
           displayName={profile.display_name || profile.slug}
           headline={profile.headline}

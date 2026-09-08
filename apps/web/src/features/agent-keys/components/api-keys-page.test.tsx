@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
-import ApiKeysPage from "@/app/dashboard/api-keys/page";
+import { ApiKeysSection } from "@/features/agent-keys/components/ApiKeysSection";
 import AgentDocsPage from "@/app/docs/agent/page";
 
 // Async MarketingNav (session-aware) suspends under legacy renderToString;
@@ -14,12 +14,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn(),
   }),
-  usePathname: () => "/dashboard/api-keys",
+  usePathname: () => "/dashboard/settings",
 }));
 
 describe("Agent API Keys UI Pages", () => {
   it("renders Agent API Keys dashboard page with honest loading/empty state and no demo keys", () => {
-    const html = renderToString(<ApiKeysPage />);
+    const html = renderToString(<ApiKeysSection />);
     expect(html).toContain("Agent API Keys");
     expect(html).toContain(
       "Generate API keys to empower AI coding agents (Claude, Cursor, Copilot, Antigravity) to update your showcase automatically via MCP."

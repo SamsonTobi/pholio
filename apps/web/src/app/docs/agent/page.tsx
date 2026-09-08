@@ -126,7 +126,7 @@ When you make meaningful changes or ship features in this repository:
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link href="/dashboard/api-keys">
+            <Link href="/dashboard/settings">
               <Button size="sm" className="gap-2">
                 <Key className="h-3.5 w-3.5" />
                 Generate Agent API Key

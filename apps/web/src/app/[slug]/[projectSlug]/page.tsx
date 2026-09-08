@@ -68,6 +68,9 @@ export default async function ProjectDeepPage({
 
   const sessionUser = await getSessionUser().catch(() => null);
   const isOwner = Boolean(sessionUser && sessionUser.id === profile.id);
+  if (!isOwner && project.show_on_showcase === false) {
+    notFound();
+  }
 
   return (
     <div className="min-h-screen">

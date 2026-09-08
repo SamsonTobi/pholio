@@ -7,17 +7,30 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const SETUP_KEY_NAME = "Agent setup";
 
+export interface AgentSetupRepo {
+  slug: string;
+  githubUrl: string;
+}
+
 export function buildAgentSetupPrompt({
   token,
   appUrl,
+  repos = [],
 }: {
   token: string;
   appUrl: string;
+  repos?: AgentSetupRepo[];
 }): string {
+  const repoLines =
+    repos.length > 0
+      ? `\nYour projects on GitHub:\n${repos
+          .map((r) => `- ${r.slug}: ${r.githubUrl}`)
+          .join("\n")}\n`
+      : "";
   return `### Pholio agent setup (${appUrl.replace(/^https?:\/\//, "")})
 API key: ${token}
 MCP endpoint: ${appUrl}/api/mcp (header: Authorization: Bearer ${token})
-
+${repoLines}
 Pholio is a self-maintaining showcase for product builders. It imports
 your GitHub repositories as projects, tracks visitors per project, and
 keeps a living showcase feed updated from your pushes — or from you,
@@ -26,15 +39,22 @@ sync_readme, upload_mockup, get_stats.
 
 First-time setup — do this now:
 1. List my Pholio projects (they were imported from GitHub).
-2. For EACH project, look through the actual local repository code and
-   write a better description: what it does, who it's for, and the most
-   interesting technical detail. Keep it factual, hype-free, 1-3 sentences.
+2. For EACH project, look through the actual local repository code — or
+   fetch the repository from its GitHub URL above when it isn't local —
+   and write a better description: what it does, who it's for, and the
+   most interesting technical detail. Keep it factual, hype-free, 1-3 sentences.
 3. Show me every proposed description and WAIT for my approval.
 4. Only after I approve, update each project using update_project.
    Never update or publish anything I haven't explicitly approved.`;
 }
 
-export function AgentSetupBanner({ appUrl }: { appUrl: string }) {
+export function AgentSetupBanner({
+  appUrl,
+  repos = [],
+}: {
+  appUrl: string;
+  repos?: AgentSetupRepo[];
+}) {
   const [status, setStatus] = React.useState<"idle" | "working" | "copied">("idle");
   const [error, setError] = React.useState<string | null>(null);
 
@@ -74,7 +94,7 @@ export function AgentSetupBanner({ appUrl }: { appUrl: string }) {
       }
 
       await navigator.clipboard.writeText(
-        buildAgentSetupPrompt({ token: data.token, appUrl })
+        buildAgentSetupPrompt({ token: data.token, appUrl, repos })
       );
       setStatus("copied");
     } catch (err) {
