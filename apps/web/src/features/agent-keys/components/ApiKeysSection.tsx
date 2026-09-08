@@ -86,11 +86,13 @@ export function ApiKeysSection() {
     }
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // The generate dialog is portalled but React events bubble through the
-    // component tree — stop the outer Settings form from saving.
-    e.stopPropagation();
+  // NOTE: this must not be a <form>. ApiKeysSection renders inside the
+  // Settings page <form>, and a nested form is invalid HTML: the browser
+  // parser drops the inner <form> tags, so a submit button silently belongs
+  // to the OUTER form and the click natively reloads the page instead of
+  // running this handler. A plain button + explicit click handler cannot
+  // natively submit anything.
+  const handleGenerate = async () => {
     if (isGenerating) return;
 
     try {
@@ -341,7 +343,7 @@ export function ApiKeysSection() {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleGenerate} className="space-y-4">
+          <div className="space-y-4">
             {generateError && (
               <div
                 role="alert"
@@ -361,9 +363,15 @@ export function ApiKeysSection() {
                 id="key-name"
                 value={keyName}
                 onChange={(e) => setKeyName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    // Block implicit submission of the outer Settings form.
+                    e.preventDefault();
+                    handleGenerate();
+                  }
+                }}
                 placeholder="e.g. Cursor IDE agent"
                 autoFocus
-                required
               />
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
                 Default scopes: <code className="font-mono text-neutral-700 dark:text-neutral-300">showcase:write, stats:read, leaderboard:read</code> (update projects, publish showcases, sync READMEs, read stats and leaderboards)
@@ -379,11 +387,11 @@ export function ApiKeysSection() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isGenerating}>
+              <Button type="button" onClick={handleGenerate} disabled={isGenerating}>
                 {isGenerating ? "Generating..." : "Generate Key"}
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
 
