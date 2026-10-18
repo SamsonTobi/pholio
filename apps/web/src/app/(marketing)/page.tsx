@@ -1,50 +1,117 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { MarketingNav, MarketingFooter } from "@/components/marketing-nav";
-import { ArrowRight } from "lucide-react";
+import {
+  COMPANY_GITHUB,
+  COMPANY_NAME,
+  IN_PROGRESS,
+  PRINCIPLES,
+  PRODUCTS,
+} from "@/lib/company";
 
-function GithubIcon({ className }: { className?: string }) {
+function Arrow({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-      />
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <path d="M7 17 17 7M8 7h9v9" strokeLinecap="square" />
     </svg>
   );
 }
 
-export default function MarketingPage() {
+export default function CompanyPage() {
   return (
-    <div className="min-h-screen flex flex-col justify-between">
-      <MarketingNav />
+    <div className="min-h-screen bg-[#E8EBF3] text-[#0A0D18] font-[family-name:var(--font-geist-sans)] selection:bg-[#1E00FF] selection:text-white">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+        <a href="#top" className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight">
+          {COMPANY_NAME}
+        </a>
+        <nav className="flex items-center gap-6 font-[family-name:var(--font-geist-mono)] text-xs uppercase tracking-wider">
+          <a className="hover:text-[#1E00FF] focus-visible:outline-2 focus-visible:outline-[#1E00FF]" href="#products">Products</a>
+          <a className="hover:text-[#1E00FF] focus-visible:outline-2 focus-visible:outline-[#1E00FF]" href="#approach">Approach</a>
+          <a className="hover:text-[#1E00FF] focus-visible:outline-2 focus-visible:outline-[#1E00FF]" href={COMPANY_GITHUB}>GitHub</a>
+        </nav>
+      </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-20 text-center max-w-4xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-600 mb-8 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Used by 300+ builders
-        </div>
+      <main id="top">
+        <section className="mx-auto max-w-6xl px-5 pb-14 pt-14 sm:px-8 sm:pb-20 sm:pt-24">
+          <p className="mb-6 font-[family-name:var(--font-geist-mono)] text-xs uppercase tracking-widest text-[#1E00FF]">
+            Independent software studio
+          </p>
+          <h1 className="max-w-4xl font-[family-name:var(--font-display)] text-5xl font-semibold leading-[0.98] tracking-tight sm:text-7xl lg:text-[5.5rem]">
+            Small software for specific problems.
+          </h1>
+          <p className="mt-8 max-w-xl text-lg leading-relaxed text-[#2A3040]">
+            Reading apps, browser extensions, agents and payment tools. We design, build and ship each one ourselves, and keep it working after launch.
+          </p>
+        </section>
 
-        <h1 className="text-4xl sm:text-6xl font-medium tracking-tighter text-primary dark:text-neutral-50 max-w-3xl mb-10">
-          Your portfolio, connected directly to your codebase.
-        </h1>
+        <section id="products" aria-labelledby="products-h" className="border-t border-[#0A0D18]">
+          <h2 id="products-h" className="sr-only">Products</h2>
+          <ul>
+            {PRODUCTS.map((p) => (
+              <li key={p.name} className="border-b border-[#0A0D18]">
+                <a
+                  href={p.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group block transition-colors duration-200 hover:bg-[#1E00FF] hover:text-white focus-visible:bg-[#1E00FF] focus-visible:text-white focus-visible:outline-none"
+                >
+                  <div className="mx-auto grid max-w-6xl gap-x-8 gap-y-3 px-5 py-7 sm:px-8 sm:py-9 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] md:items-center">
+                    <div>
+                      <p className="mb-2 font-[family-name:var(--font-geist-mono)] text-[11px] uppercase tracking-widest opacity-60">
+                        {p.kind} · {p.platform}
+                      </p>
+                      <h3 className="font-[family-name:var(--font-display)] text-5xl font-semibold leading-none tracking-tight sm:text-7xl">
+                        {p.name}
+                      </h3>
+                    </div>
+                    <p className="max-w-md text-base leading-relaxed text-[#2A3040] transition-colors group-hover:text-white/90 group-focus-visible:text-white/90">
+                      {p.summary}
+                    </p>
+                    <div className="flex items-center gap-3 font-[family-name:var(--font-geist-mono)] text-xs md:justify-end">
+                      <span className="opacity-70">{p.host}</span>
+                      <Arrow className="h-7 w-7 transition-transform duration-200 group-hover:translate-x-1 group-hover:-translate-y-1" />
+                    </div>
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-        <p className="text-sm sm:text-lg text-primary dark:text-neutral-400 max-w-xl mb-10 leading-relaxed">
-          Connect GitHub once. Pholio connects your coding agent to your public showcase, so shipping and showcasing happen together.
-        </p>
+        <section id="approach" aria-labelledby="approach-h" className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
+          <h2 id="approach-h" className="max-w-2xl font-[family-name:var(--font-display)] text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
+            How we build.
+          </h2>
+          <dl className="mt-12 grid gap-x-12 gap-y-10 sm:grid-cols-2">
+            {PRINCIPLES.map((x) => (
+              <div key={x.title} className="border-t border-[#0A0D18] pt-4">
+                <dt className="font-[family-name:var(--font-display)] text-xl font-semibold">{x.title}</dt>
+                <dd className="mt-2 max-w-md leading-relaxed text-[#2A3040]">{x.body}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <Link href="/login">
-            <Button size="lg" className="w-full sm:w-auto gap-2">
-              <GithubIcon className="h-8 w-8" />
-              Sign in with GitHub
-            </Button>
-          </Link>
-        </div>
+        <section aria-labelledby="next-h" className="border-t border-[#0A0D18] bg-[#0A0D18] text-[#E8EBF3]">
+          <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
+            <h2 id="next-h" className="font-[family-name:var(--font-geist-mono)] text-xs uppercase tracking-widest text-[#8E80FF]">
+              In progress
+            </h2>
+            <ul className="mt-8 grid gap-10 sm:grid-cols-2">
+              {IN_PROGRESS.map((x) => (
+                <li key={x.name}>
+                  <p className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight">{x.name}</p>
+                  <p className="mt-2 max-w-md leading-relaxed text-[#B9BED0]">{x.summary}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       </main>
 
-      <MarketingFooter />
+      <footer className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-8 font-[family-name:var(--font-geist-mono)] text-xs text-[#2A3040] sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <span>&copy; {new Date().getFullYear()} {COMPANY_NAME}</span>
+        <a className="underline underline-offset-4 hover:text-[#1E00FF]" href={COMPANY_GITHUB}>
+          github.com/SamsonTobi
+        </a>
+      </footer>
     </div>
   );
 }
