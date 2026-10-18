@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: `${COMPANY_NAME} — Small software for specific problems`,
   description:
-    "An independent software studio. Booksie, Ralfe, LinkPaddy, OTPBadger and Stall: each one built to solve a single problem well.",
+    "Independent software, built by one person. Booksie, Ralfe, LinkPaddy, OTPBadger and Stall: each one built to solve a single problem well.",
 };
 
 export default function RootLayout({
