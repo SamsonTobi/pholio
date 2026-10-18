@@ -31,13 +31,13 @@ export default function CompanyPage() {
       <main id="top">
         <section className="mx-auto max-w-6xl px-5 pb-14 pt-14 sm:px-8 sm:pb-20 sm:pt-24">
           <p className="mb-6 font-[family-name:var(--font-geist-mono)] text-xs uppercase tracking-widest text-[#1E00FF]">
-            Independent software studio
+            Independent software, built by one person
           </p>
           <h1 className="max-w-4xl font-[family-name:var(--font-display)] text-5xl font-semibold leading-[0.98] tracking-tight sm:text-7xl lg:text-[5.5rem]">
             Small software for specific problems.
           </h1>
           <p className="mt-8 max-w-xl text-lg leading-relaxed text-[#2A3040]">
-            Reading apps, browser extensions, agents and payment tools. We design, build and ship each one ourselves, and keep it working after launch.
+            Reading apps, browser extensions, agents and payment tools. I design, build and ship each one myself, and keep it working after launch.
           </p>
         </section>
 
@@ -77,7 +77,7 @@ export default function CompanyPage() {
 
         <section id="approach" aria-labelledby="approach-h" className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
           <h2 id="approach-h" className="max-w-2xl font-[family-name:var(--font-display)] text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            How we build.
+            How I build.
           </h2>
           <dl className="mt-12 grid gap-x-12 gap-y-10 sm:grid-cols-2">
             {PRINCIPLES.map((x) => (

@@ -62,15 +62,15 @@ export const PRODUCTS: Product[] = [
 export const PRINCIPLES = [
   {
     title: "One problem each",
-    body: "Every product starts with a single, specific annoyance. If it needs a long explanation, we cut it down.",
+    body: "Every product starts with a single, specific annoyance. If it needs a long explanation, I cut it down.",
   },
   {
     title: "Your data stays yours",
-    body: "We lean local-first: files, mail and history live on your device wherever the product allows it.",
+    body: "I lean local-first: files, mail and history live on your device wherever the product allows it.",
   },
   {
     title: "Say only what it does",
-    body: "No invented claims in the product or on its page. If a feature isn't shipped, we don't list it.",
+    body: "No invented claims in the product or on its page. If a feature isn't shipped, I don't list it.",
   },
   {
     title: "Ship, then keep shipping",
