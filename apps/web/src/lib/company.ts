@@ -1,6 +1,5 @@
 // Single source of truth for the parent-company site.
-// COMPANY_NAME is a placeholder: change it here and it updates everywhere.
-export const COMPANY_NAME = "Smallworks";
+export const COMPANY_NAME = "Pholio";
 export const COMPANY_GITHUB = "https://github.com/SamsonTobi";
 
 export type Product = {
@@ -85,7 +84,7 @@ export const IN_PROGRESS = [
     summary: "An Umrah companion for iOS and Android. Core guidance works offline with no account.",
   },
   {
-    name: "Pholio",
-    summary: "A self-updating portfolio that reads your GitHub and your coding agent. Moving to its own home.",
+    name: "Shipfolio",
+    summary: "A self-updating portfolio that reads your GitHub and your coding agent, so your showcase stays current as you ship.",
   },
 ];
